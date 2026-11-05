@@ -1,8 +1,8 @@
 package com.example.util
 
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 object DateUtils {
     private val monthNamesShort = arrayOf(
@@ -54,6 +54,28 @@ object DateUtils {
         return cal
     }
 
+    fun dateKeyToUtcMillis(dateKey: String): Long {
+        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        val parts = dateKey.split("-")
+        if (parts.size == 3) {
+            val y = parts[0].toIntOrNull() ?: currentYear()
+            val m = (parts[1].toIntOrNull() ?: 1) - 1
+            val d = parts[2].toIntOrNull() ?: 1
+            cal.set(y, m, d, 12, 0, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+        }
+        return cal.timeInMillis
+    }
+
+    fun utcMillisToDateKey(utcMillis: Long): String {
+        val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        cal.timeInMillis = utcMillis
+        val y = cal.get(Calendar.YEAR)
+        val m = cal.get(Calendar.MONTH) + 1
+        val d = cal.get(Calendar.DAY_OF_MONTH)
+        return String.format(Locale.US, "%04d-%02d-%02d", y, m, d)
+    }
+
     fun addDays(dateKey: String, offsetDays: Int): String {
         val cal = parseDateKey(dateKey)
         cal.add(Calendar.DAY_OF_MONTH, offsetDays)
@@ -75,6 +97,16 @@ object DateUtils {
                 isToday = key == today
             )
         }
+    }
+
+    /**
+     * Formats date as "MMM XX" (e.g., "Nov 05") for the top center header.
+     */
+    fun formatShortMonthDay(dateKey: String): String {
+        val cal = parseDateKey(dateKey)
+        val month = monthNamesShort[cal.get(Calendar.MONTH).coerceIn(0, 11)]
+        val day = cal.get(Calendar.DAY_OF_MONTH)
+        return String.format(Locale.US, "%s %02d", month, day)
     }
 
     fun formatFullDateHeader(dateKey: String): String {
@@ -127,14 +159,10 @@ object DateUtils {
     fun monthNameShort(monthZeroIndexed: Int): String =
         monthNamesShort[monthZeroIndexed.coerceIn(0, 11)]
 
-    /**
-     * Generates the calendar grid cells for a given year and 0-indexed month (0 = Jan .. 11 = Dec).
-     * Returns leading nulls for empty weekday slots before the 1st of the month, followed by YYYY-MM-DD keys.
-     */
     fun getMonthGridDays(year: Int, monthZeroIndexed: Int): List<String?> {
         val cal = Calendar.getInstance()
         cal.set(year, monthZeroIndexed, 1, 12, 0, 0)
-        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1 // 0 = Sun .. 6 = Sat
+        val firstDayOfWeek = cal.get(Calendar.DAY_OF_WEEK) - 1
         val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
 
         val cells = ArrayList<String?>(firstDayOfWeek + daysInMonth)
@@ -145,12 +173,13 @@ object DateUtils {
         return cells
     }
 
-    /**
-     * Returns the 21-year range: 10 years in the past through 10 years in the future.
-     */
-    fun getTwentyYearHorizon(): List<Int> {
+    fun getSupportedYearRange(): IntRange {
         val center = currentYear()
-        return ((center - 10)..(center + 10)).toList()
+        return (center - 10)..(center + 10)
+    }
+
+    fun getTwentyYearHorizon(): List<Int> {
+        return getSupportedYearRange().toList()
     }
 }
 

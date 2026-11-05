@@ -2,7 +2,7 @@
   "entities": {
     "DayTask": {
       "title": "DayTask",
-      "description": "A time-blocked daily task or activity tile scheduled on a specific date in the 20-year timeline.",
+      "description": "A time-blocked daily task or activity tile scheduled on a specific date.",
       "type": "object",
       "properties": {
         "userId": {
@@ -31,12 +31,16 @@
         },
         "category": {
           "type": "string",
-          "enum": ["focus", "work", "personal", "health", "routine", "creative"],
+          "enum": ["focus", "work", "personal", "health", "break", "routine", "creative"],
           "description": "Activity category for visual tile styling."
         },
         "colorIndex": {
           "type": "integer",
           "description": "Palette index (0 to 5) for the tile accent color."
+        },
+        "reminderMinutes": {
+          "type": "integer",
+          "description": "Minutes before start time to trigger a notification reminder (-1 for none)."
         },
         "completed": {
           "type": "boolean",
@@ -119,7 +123,7 @@
       "schema": {
         "$ref": "#/entities/DayTask"
       },
-      "description": "Per-user collection of daily timeline task tiles across past, present, and future dates."
+      "description": "Per-user collection of daily timeline task tiles."
     },
     "/users/{userId}/journals/{dateKey}": {
       "schema": {

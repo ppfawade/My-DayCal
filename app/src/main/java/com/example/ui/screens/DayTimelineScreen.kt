@@ -25,8 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Book
@@ -35,10 +33,8 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Today
-import androidx.compose.material.icons.filled.ViewStream
-import androidx.compose.material.icons.filled.ViewTimeline
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -74,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
+import com.example.data.model.ReminderOption
 import com.example.data.model.TaskCategory
 import com.example.data.model.endMinute
 import com.example.ui.theme.getTilePalette
@@ -83,9 +80,9 @@ import com.example.util.DateUtils
 @Composable
 fun DayTimelineScreen(
     uiState: DaytileUiState,
+    showFull24HourGrid: Boolean,
+    onSwitchTo24h: () -> Unit,
     onSelectDate: (String) -> Unit,
-    onStepDay: (Int) -> Unit,
-    onJumpToToday: () -> Unit,
     onOpenCreateTask: (presetHourMinute: Int) -> Unit,
     onEditTask: (DayTask) -> Unit,
     onToggleTask: (DayTask) -> Unit,
@@ -97,7 +94,6 @@ fun DayTimelineScreen(
 ) {
     val selectedDate = uiState.selectedDateKey
     val surroundingDays = remember(selectedDate) { DateUtils.getSurroundingDays(selectedDate, radius = 3) }
-    var showFull24HourGrid by rememberSaveable { mutableStateOf(false) }
     var isJournalExpanded by rememberSaveable { mutableStateOf(true) }
 
     val tasks = uiState.selectedDayTasks
@@ -111,11 +107,10 @@ fun DayTimelineScreen(
             .testTag("day_timeline_list"),
         contentPadding = PaddingValues(bottom = 104.dp)
     ) {
-        // 1. Focused Single-Day Header & 7-Day Ribbon
+        // 1. Compact 7-Day Ribbon & Completion Bar (date title is in top bar center as MMM XX)
         item(key = "day_header") {
             SingleDayHeaderSection(
                 selectedDateKey = selectedDate,
-                todayDateKey = uiState.todayDateKey,
                 surroundingDays = surroundingDays,
                 tasksByDate = uiState.tasksByDate,
                 journalsByDate = uiState.journalsByDate,
@@ -123,71 +118,18 @@ fun DayTimelineScreen(
                 totalCount = tasks.size,
                 totalMinutes = totalMinutes,
                 progress = progress,
-                onSelectDate = onSelectDate,
-                onStepDay = onStepDay,
-                onJumpToToday = onJumpToToday
+                onSelectDate = onSelectDate
             )
+            Spacer(modifier = Modifier.height(8.dp))
         }
 
-        // 2. View Mode Switcher (Focused Tile Stream vs Full 24-Hour Grid)
-        item(key = "timeline_toolbar") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "DAILY TIMELINE TILES",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = if (showFull24HourGrid) "24-hour axis • Tap any free slot to add" else "Focused blocks • Fast adjust & complete",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { showFull24HourGrid = !showFull24HourGrid }
-                        .testTag("toggle_24h_grid_button")
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (showFull24HourGrid) Icons.Default.ViewStream else Icons.Default.ViewTimeline,
-                            contentDescription = "Switch timeline mode",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (showFull24HourGrid) "Focused" else "24h Grid",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-        }
-
-        // 3. Tasks or Empty Day Canvas
+        // 2. Tasks or Empty Day Canvas
         if (tasks.isEmpty() && !showFull24HourGrid) {
             item(key = "empty_day_state") {
                 EmptyDayTileCard(
-                    selectedDateKey = selectedDate,
                     onOpenCreateTask = { onOpenCreateTask(9 * 60) },
                     onPopulateStarterDay = onPopulateStarterDay,
-                    onSwitchTo24h = { showFull24HourGrid = true }
+                    onSwitchTo24h = onSwitchTo24h
                 )
             }
         } else if (showFull24HourGrid) {
@@ -238,7 +180,7 @@ fun DayTimelineScreen(
             }
         }
 
-        // 4. Daily Journal & Reflection Card for this specific day
+        // 3. Daily Journal & Reflection Card
         item(key = "daily_journal_card") {
             Spacer(modifier = Modifier.height(12.dp))
             DailyJournalSection(
@@ -255,7 +197,6 @@ fun DayTimelineScreen(
 @Composable
 private fun SingleDayHeaderSection(
     selectedDateKey: String,
-    todayDateKey: String,
     surroundingDays: List<com.example.util.DayChipInfo>,
     tasksByDate: Map<String, List<DayTask>>,
     journalsByDate: Map<String, DayJournal>,
@@ -263,17 +204,8 @@ private fun SingleDayHeaderSection(
     totalCount: Int,
     totalMinutes: Int,
     progress: Float,
-    onSelectDate: (String) -> Unit,
-    onStepDay: (Int) -> Unit,
-    onJumpToToday: () -> Unit
+    onSelectDate: (String) -> Unit
 ) {
-    val relativeLabel = remember(selectedDateKey, todayDateKey) {
-        DateUtils.formatRelativeLabel(selectedDateKey)
-    }
-    val fullDateTitle = remember(selectedDateKey) {
-        DateUtils.formatFullDateHeader(selectedDateKey)
-    }
-
     Surface(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp,
@@ -282,111 +214,8 @@ private fun SingleDayHeaderSection(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 16.dp)
+                .padding(top = 10.dp, bottom = 14.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { onStepDay(-1) },
-                    modifier = Modifier.testTag("prev_day_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                        contentDescription = "Previous day"
-                    )
-                }
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = when {
-                                selectedDateKey == todayDateKey -> MaterialTheme.colorScheme.primaryContainer
-                                selectedDateKey < todayDateKey -> MaterialTheme.colorScheme.secondaryContainer
-                                else -> MaterialTheme.colorScheme.tertiaryContainer
-                            }
-                        ) {
-                            Text(
-                                text = when {
-                                    selectedDateKey == todayDateKey -> "TODAY • FOCUS"
-                                    selectedDateKey < todayDateKey -> "ARCHIVE • $relativeLabel"
-                                    else -> "FUTURE PLAN • $relativeLabel"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = when {
-                                    selectedDateKey == todayDateKey -> MaterialTheme.colorScheme.onPrimaryContainer
-                                    selectedDateKey < todayDateKey -> MaterialTheme.colorScheme.onSecondaryContainer
-                                    else -> MaterialTheme.colorScheme.onTertiaryContainer
-                                },
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
-                        }
-
-                        if (selectedDateKey != todayDateKey) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { onJumpToToday() }
-                                    .testTag("jump_today_chip")
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Today,
-                                        contentDescription = "Jump to Today",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = stringResource(id = R.string.btn_jump_today),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Text(
-                        text = fullDateTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                IconButton(
-                    onClick = { onStepDay(1) },
-                    modifier = Modifier.testTag("next_day_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = "Next day"
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
             // 7-day interactive ribbon centered around the selected date
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
@@ -406,7 +235,7 @@ private fun SingleDayHeaderSection(
                             else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         },
                         modifier = Modifier
-                            .width(52.dp)
+                            .width(50.dp)
                             .clip(MaterialTheme.shapes.medium)
                             .clickable { onSelectDate(dayInfo.dateKey) }
                             .testTag("day_ribbon_${dayInfo.dateKey}")
@@ -471,7 +300,7 @@ private fun SingleDayHeaderSection(
 
             // Daily summary bar
             if (totalCount > 0) {
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -514,7 +343,8 @@ fun DayTaskTileCard(
     onDeleteTask: () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
-    val palette = getTilePalette(task.colorIndex.toInt())
+    val categoryObj = TaskCategory.fromKey(task.category)
+    val palette = getTilePalette(categoryObj.fixedColorIndex)
     val containerColor = if (isDark) palette.containerDark else palette.containerLight
     val contentColor = if (isDark) palette.onContainerDark else palette.onContainerLight
     var isExpanded by rememberSaveable(task.id) { mutableStateOf(false) }
@@ -522,7 +352,7 @@ fun DayTaskTileCard(
     val startStr = DateUtils.formatMinutesToTime(task.startMinute.toInt())
     val endStr = DateUtils.formatMinutesToTime(task.endMinute)
     val durationStr = DateUtils.formatDuration(task.durationMinutes.toInt())
-    val categoryLabel = TaskCategory.fromKey(task.category).label
+    val reminderOpt = ReminderOption.fromMinutes(task.reminderMinutes.toInt())
 
     Card(
         shape = MaterialTheme.shapes.medium,
@@ -578,7 +408,7 @@ fun DayTaskTileCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = "$startStr – $endStr",
@@ -593,11 +423,30 @@ fun DayTaskTileCard(
                             shape = RoundedCornerShape(6.dp),
                             color = palette.accent.copy(alpha = 0.18f)
                         ) {
-                            Text(
-                                text = "$durationStr • $categoryLabel",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = contentColor,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .clip(CircleShape)
+                                        .background(palette.accent)
+                                )
+                                Text(
+                                    text = "$durationStr • ${categoryObj.label}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = contentColor
+                                )
+                            }
+                        }
+                        if (reminderOpt != ReminderOption.NONE) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = "Reminder: ${reminderOpt.label}",
+                                tint = palette.accent,
+                                modifier = Modifier.size(14.dp)
                             )
                         }
                     }
@@ -890,7 +739,6 @@ private fun QuickHourLauncherRow(
 
 @Composable
 private fun EmptyDayTileCard(
-    selectedDateKey: String,
     onOpenCreateTask: () -> Unit,
     onPopulateStarterDay: () -> Unit,
     onSwitchTo24h: () -> Unit
@@ -933,7 +781,7 @@ private fun EmptyDayTileCard(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "No time tiles scheduled for $selectedDateKey yet. Block your hours intentionally or open the 24-hour grid.",
+                text = "No time tiles scheduled yet. Block your hours intentionally or switch to the 24h view.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1056,7 +904,7 @@ private fun DailyJournalSection(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = if (existingJournal != null) "Saved for $dateKey" else "Capture your intention & reflection for $dateKey",
+                            text = if (existingJournal != null) "Reflection saved" else "Capture your intention & reflection",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

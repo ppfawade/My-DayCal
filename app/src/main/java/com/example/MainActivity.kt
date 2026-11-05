@@ -1,19 +1,22 @@
 package com.example
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -23,7 +26,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,14 +38,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudQueue
-import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.ViewStream
+import androidx.compose.material.icons.filled.ViewTimeline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -47,8 +56,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -57,8 +64,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -76,7 +82,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -85,19 +93,19 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.data.local.LocalDaytileDatabase
 import com.example.data.model.DayTask
+import com.example.data.model.ReminderOption
 import com.example.data.model.TaskCategory
 import com.example.data.repository.CloudPlannerDataSource
 import com.example.data.repository.DaytileRepository
 import com.example.data.repository.LocalPlannerDataSource
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
-import com.example.ui.screens.ArchiveScreen
 import com.example.ui.screens.DayTimelineScreen
-import com.example.ui.screens.MultiYearCalendarScreen
-import com.example.ui.theme.DaytilePalettes
 import com.example.ui.theme.DaytileTheme
+import com.example.ui.theme.getTilePalette
 import com.example.ui.viewmodel.DaytileViewModel
 import com.example.util.DateUtils
+import com.example.util.ReminderNotificationManager
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -113,6 +121,7 @@ private const val KEY_LOCAL_MODE = "use_local_storage_mode"
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ReminderNotificationManager.createNotificationChannels(this)
         enableEdgeToEdge()
         setContent {
             DaytileTheme {
@@ -128,12 +137,6 @@ internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     }
     addAuthStateListener(listener)
     awaitClose { removeAuthStateListener(listener) }
-}
-
-enum class DaytileDestination(val titleRes: Int) {
-    DAY_VIEW(R.string.tab_today),
-    ARCHIVE(R.string.tab_archive),
-    MULTI_YEAR_CALENDAR(R.string.tab_calendar)
 }
 
 @Composable
@@ -234,16 +237,13 @@ fun DaytilePlannerShell(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    var currentDestination by rememberSaveable { mutableStateOf(DaytileDestination.DAY_VIEW) }
+    var showFull24HourGrid by rememberSaveable { mutableStateOf(false) }
+    var showDatePickerModal by rememberSaveable { mutableStateOf(false) }
     var showTaskEditorSheet by rememberSaveable { mutableStateOf(false) }
     var editingTask by remember { mutableStateOf<DayTask?>(null) }
     var presetDateForNewTask by rememberSaveable { mutableStateOf(uiState.selectedDateKey) }
     var presetStartMinute by rememberSaveable { mutableIntStateOf(9 * 60) }
     var showStorageInfoDialog by rememberSaveable { mutableStateOf(false) }
-
-    BackHandler(enabled = currentDestination != DaytileDestination.DAY_VIEW) {
-        currentDestination = DaytileDestination.DAY_VIEW
-    }
 
     LaunchedEffect(uiState.statusBanner) {
         val msg = uiState.statusBanner
@@ -257,91 +257,25 @@ fun DaytilePlannerShell(
         contentWindowInsets = WindowInsets.safeDrawing,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Text(
-                            text = stringResource(id = R.string.app_name),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isCloudMode) {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant
-                            },
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { showStorageInfoDialog = true }
-                                .testTag("storage_mode_badge")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = if (isCloudMode) Icons.Default.CloudDone else Icons.Default.PhoneAndroid,
-                                    contentDescription = "Storage Mode Info",
-                                    tint = if (isCloudMode) {
-                                        MaterialTheme.colorScheme.onSecondaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isCloudMode) "Synced" else "Local",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = if (isCloudMode) {
-                                        MaterialTheme.colorScheme.onSecondaryContainer
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    }
-                                )
-                            }
-                        }
-                    }
-                },
-                actions = {
+            DayCalTopBar(
+                selectedDateKey = uiState.selectedDateKey,
+                isCloudMode = isCloudMode,
+                showFull24HourGrid = showFull24HourGrid,
+                onOpenDatePicker = { showDatePickerModal = true },
+                onToggle24hMode = { showFull24HourGrid = !showFull24HourGrid },
+                onOpenStorageInfo = { showStorageInfoDialog = true },
+                onCloudAction = {
                     if (isCloudMode) {
-                        IconButton(
-                            onClick = {
-                                val credentialManager = CredentialManager.create(context)
-                                signOutUser(
-                                    credentialManager = credentialManager,
-                                    onSignOutComplete = onExitCurrentMode,
-                                    scope = scope
-                                )
-                            },
-                            modifier = Modifier.testTag("sign_out_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Logout,
-                                contentDescription = stringResource(id = R.string.sign_out)
-                            )
-                        }
+                        val credentialManager = CredentialManager.create(context)
+                        signOutUser(
+                            credentialManager = credentialManager,
+                            onSignOutComplete = onExitCurrentMode,
+                            scope = scope
+                        )
                     } else {
-                        IconButton(
-                            onClick = onExitCurrentMode,
-                            modifier = Modifier.testTag("switch_to_cloud_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudQueue,
-                                contentDescription = "Switch to Google Cloud Sync"
-                            )
-                        }
+                        onExitCurrentMode()
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
+                }
             )
         },
         floatingActionButton = {
@@ -363,31 +297,6 @@ fun DaytilePlannerShell(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier.testTag("fab_add_task")
             )
-        },
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = currentDestination == DaytileDestination.DAY_VIEW,
-                    onClick = { currentDestination = DaytileDestination.DAY_VIEW },
-                    icon = { Icon(Icons.Default.Schedule, contentDescription = null) },
-                    label = { Text(stringResource(id = R.string.tab_today)) },
-                    modifier = Modifier.testTag("nav_day_view")
-                )
-                NavigationBarItem(
-                    selected = currentDestination == DaytileDestination.ARCHIVE,
-                    onClick = { currentDestination = DaytileDestination.ARCHIVE },
-                    icon = { Icon(Icons.Default.History, contentDescription = null) },
-                    label = { Text(stringResource(id = R.string.tab_archive)) },
-                    modifier = Modifier.testTag("nav_archive")
-                )
-                NavigationBarItem(
-                    selected = currentDestination == DaytileDestination.MULTI_YEAR_CALENDAR,
-                    onClick = { currentDestination = DaytileDestination.MULTI_YEAR_CALENDAR },
-                    icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    label = { Text(stringResource(id = R.string.tab_calendar)) },
-                    modifier = Modifier.testTag("nav_calendar")
-                )
-            }
         }
     ) { innerPadding ->
         Box(
@@ -395,74 +304,55 @@ fun DaytilePlannerShell(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (currentDestination) {
-                DaytileDestination.DAY_VIEW -> {
-                    DayTimelineScreen(
-                        uiState = uiState,
-                        onSelectDate = { viewModel.selectDate(it) },
-                        onStepDay = { viewModel.stepDay(it) },
-                        onJumpToToday = { viewModel.jumpToToday() },
-                        onOpenCreateTask = { minute ->
-                            editingTask = null
-                            presetDateForNewTask = uiState.selectedDateKey
-                            presetStartMinute = minute
-                            showTaskEditorSheet = true
-                        },
-                        onEditTask = { task ->
-                            editingTask = task
-                            presetDateForNewTask = task.dateKey
-                            presetStartMinute = task.startMinute.toInt()
-                            showTaskEditorSheet = true
-                        },
-                        onToggleTask = { viewModel.toggleTaskCompleted(it) },
-                        onAdjustTaskSchedule = { task, newStart, newDur ->
-                            viewModel.adjustTaskSchedule(task, newStart, newDur)
-                        },
-                        onDeleteTask = { viewModel.deleteTask(it) },
-                        onSaveJournal = { headline, content, mood ->
-                            viewModel.saveJournalForDate(
-                                dateKey = uiState.selectedDateKey,
-                                headline = headline,
-                                content = content,
-                                moodScore = mood
-                            )
-                        },
-                        onPopulateStarterDay = {
-                            viewModel.populateSampleDay(uiState.selectedDateKey)
-                        }
+            DayTimelineScreen(
+                uiState = uiState,
+                showFull24HourGrid = showFull24HourGrid,
+                onSwitchTo24h = { showFull24HourGrid = true },
+                onSelectDate = { viewModel.selectDate(it) },
+                onOpenCreateTask = { minute ->
+                    editingTask = null
+                    presetDateForNewTask = uiState.selectedDateKey
+                    presetStartMinute = minute
+                    showTaskEditorSheet = true
+                },
+                onEditTask = { task ->
+                    editingTask = task
+                    presetDateForNewTask = task.dateKey
+                    presetStartMinute = task.startMinute.toInt()
+                    showTaskEditorSheet = true
+                },
+                onToggleTask = { viewModel.toggleTaskCompleted(it) },
+                onAdjustTaskSchedule = { task, newStart, newDur ->
+                    viewModel.adjustTaskSchedule(task, newStart, newDur)
+                },
+                onDeleteTask = { taskId ->
+                    ReminderNotificationManager.cancelTaskReminder(context, taskId)
+                    viewModel.deleteTask(taskId)
+                },
+                onSaveJournal = { headline, content, mood ->
+                    viewModel.saveJournalForDate(
+                        dateKey = uiState.selectedDateKey,
+                        headline = headline,
+                        content = content,
+                        moodScore = mood
                     )
+                },
+                onPopulateStarterDay = {
+                    viewModel.populateSampleDay(uiState.selectedDateKey)
                 }
-
-                DaytileDestination.ARCHIVE -> {
-                    ArchiveScreen(
-                        uiState = uiState,
-                        onOpenDayInTimeline = { dateKey ->
-                            viewModel.selectDate(dateKey)
-                            currentDestination = DaytileDestination.DAY_VIEW
-                        }
-                    )
-                }
-
-                DaytileDestination.MULTI_YEAR_CALENDAR -> {
-                    MultiYearCalendarScreen(
-                        uiState = uiState,
-                        onSetYearMonth = { y, m -> viewModel.setCalendarYearMonth(y, m) },
-                        onStepMonth = { delta -> viewModel.stepCalendarMonth(delta) },
-                        onSelectDateAndOpenDay = { dateKey ->
-                            viewModel.selectDate(dateKey)
-                            currentDestination = DaytileDestination.DAY_VIEW
-                        },
-                        onScheduleTaskForDate = { dateKey ->
-                            viewModel.selectDate(dateKey)
-                            editingTask = null
-                            presetDateForNewTask = dateKey
-                            presetStartMinute = 9 * 60
-                            showTaskEditorSheet = true
-                        }
-                    )
-                }
-            }
+            )
         }
+    }
+
+    if (showDatePickerModal) {
+        CalendarDatePickerModal(
+            initialDateKey = uiState.selectedDateKey,
+            onDismiss = { showDatePickerModal = false },
+            onDateSelected = { pickedDateKey ->
+                viewModel.selectDate(pickedDateKey)
+                showDatePickerModal = false
+            }
+        )
     }
 
     if (showTaskEditorSheet) {
@@ -474,9 +364,19 @@ fun DaytilePlannerShell(
                 defaultDateKey = presetDateForNewTask,
                 defaultStartMinute = presetStartMinute,
                 onDismiss = { showTaskEditorSheet = false },
-                onSave = { title, notes, dateKey, startMin, durationMin, category, colorIdx ->
+                onSave = { title, notes, dateKey, startMin, durationMin, category, colorIdx, reminderMins ->
                     val existing = editingTask
                     if (existing != null) {
+                        val updatedTask = existing.copy(
+                            title = title,
+                            notes = notes,
+                            dateKey = dateKey,
+                            startMinute = startMin.toLong(),
+                            durationMinutes = durationMin.toLong(),
+                            category = category,
+                            colorIndex = colorIdx.toLong(),
+                            reminderMinutes = reminderMins.toLong()
+                        )
                         viewModel.updateTaskFull(
                             task = existing,
                             title = title,
@@ -485,7 +385,12 @@ fun DaytilePlannerShell(
                             startMinute = startMin,
                             durationMinutes = durationMin,
                             category = category,
-                            colorIndex = colorIdx
+                            colorIndex = colorIdx,
+                            reminderMinutes = reminderMins
+                        )
+                        ReminderNotificationManager.scheduleTaskReminder(
+                            context = context,
+                            task = updatedTask
                         )
                     } else {
                         viewModel.addTask(
@@ -495,7 +400,25 @@ fun DaytilePlannerShell(
                             startMinute = startMin,
                             durationMinutes = durationMin,
                             category = category,
-                            colorIndex = colorIdx
+                            colorIndex = colorIdx,
+                            reminderMinutes = reminderMins,
+                            onTaskCreated = { createdId ->
+                                ReminderNotificationManager.scheduleTaskReminder(
+                                    context = context,
+                                    task = DayTask(
+                                        id = createdId,
+                                        userId = currentUserId,
+                                        dateKey = dateKey,
+                                        title = title,
+                                        notes = notes,
+                                        startMinute = startMin.toLong(),
+                                        durationMinutes = durationMin.toLong(),
+                                        category = category,
+                                        colorIndex = colorIdx.toLong(),
+                                        reminderMinutes = reminderMins.toLong()
+                                    )
+                                )
+                            }
                         )
                     }
                     viewModel.selectDate(dateKey)
@@ -503,6 +426,7 @@ fun DaytilePlannerShell(
                 },
                 onDelete = editingTask?.let { taskToDelete ->
                     {
+                        ReminderNotificationManager.cancelTaskReminder(context, taskToDelete.id)
                         viewModel.deleteTask(taskToDelete.id)
                         showTaskEditorSheet = false
                     }
@@ -522,7 +446,7 @@ fun DaytilePlannerShell(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isCloudMode) {
                         Text(
-                            text = "Your timeline tiles, future plans, and past journal archives sync automatically in real time using free Google Firebase services.",
+                            text = "Your timeline tiles and reflections sync automatically in real time using free Google Firebase services.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
@@ -574,7 +498,228 @@ fun DaytilePlannerShell(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DayCalTopBar(
+    selectedDateKey: String,
+    isCloudMode: Boolean,
+    showFull24HourGrid: Boolean,
+    onOpenDatePicker: () -> Unit,
+    onToggle24hMode: () -> Unit,
+    onOpenStorageInfo: () -> Unit,
+    onCloudAction: () -> Unit
+) {
+    val shortDateText = remember(selectedDateKey) {
+        DateUtils.formatShortMonthDay(selectedDateKey)
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp)
+                .padding(horizontal = 12.dp)
+        ) {
+            // Left: App Title + Storage Mode Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.align(Alignment.CenterStart)
+            ) {
+                Text(
+                    text = stringResource(id = R.string.app_name),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1
+                )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isCloudMode) {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable { onOpenStorageInfo() }
+                        .testTag("storage_mode_badge")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isCloudMode) Icons.Default.CloudDone else Icons.Default.PhoneAndroid,
+                            contentDescription = "Storage Mode Info",
+                            tint = if (isCloudMode) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = if (isCloudMode) "Sync" else "Local",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isCloudMode) {
+                                MaterialTheme.colorScheme.onSecondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Center: MMM XX Date Picker Trigger
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onOpenDatePicker() }
+                    .testTag("top_date_picker_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = "Open calendar date picker",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = shortDateText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Right: 24h / Focus Toggle + Cloud Action Button
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (showFull24HourGrid) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onToggle24hMode() }
+                        .testTag("toggle_24h_grid_button")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (showFull24HourGrid) Icons.Default.ViewTimeline else Icons.Default.ViewStream,
+                            contentDescription = "Toggle 24h and Focus view",
+                            modifier = Modifier.size(15.dp),
+                            tint = if (showFull24HourGrid) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Text(
+                            text = if (showFull24HourGrid) "24h" else "Focus",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (showFull24HourGrid) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
+                }
+
+                IconButton(
+                    onClick = onCloudAction,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .testTag(if (isCloudMode) "sign_out_button" else "switch_to_cloud_button")
+                ) {
+                    Icon(
+                        imageVector = if (isCloudMode) Icons.AutoMirrored.Filled.Logout else Icons.Default.CloudQueue,
+                        contentDescription = if (isCloudMode) stringResource(id = R.string.sign_out) else "Switch to Google Cloud Sync"
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CalendarDatePickerModal(
+    initialDateKey: String,
+    onDismiss: () -> Unit,
+    onDateSelected: (String) -> Unit
+) {
+    val initialMillis = remember(initialDateKey) {
+        DateUtils.dateKeyToUtcMillis(initialDateKey)
+    }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialMillis,
+        yearRange = DateUtils.getSupportedYearRange()
+    )
+
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    onClick = {
+                        onDateSelected(DateUtils.todayDateKey())
+                    }
+                ) {
+                    Text("Today")
+                }
+                Button(
+                    onClick = {
+                        val selectedMillis = datePickerState.selectedDateMillis
+                        if (selectedMillis != null) {
+                            onDateSelected(DateUtils.utcMillisToDateKey(selectedMillis))
+                        } else {
+                            onDismiss()
+                        }
+                    },
+                    modifier = Modifier.testTag("confirm_date_picker_button")
+                ) {
+                    Text("Select")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    ) {
+        DatePicker(state = datePickerState)
+    }
+}
+
 @Composable
 private fun TaskTileEditorSheetContent(
     initialTask: DayTask?,
@@ -588,10 +733,12 @@ private fun TaskTileEditorSheetContent(
         startMinute: Int,
         durationMinutes: Int,
         category: String,
-        colorIndex: Int
+        colorIndex: Int,
+        reminderMinutes: Int
     ) -> Unit,
     onDelete: (() -> Unit)?
 ) {
+    val context = LocalContext.current
     var title by rememberSaveable { mutableStateOf(initialTask?.title ?: "") }
     var notes by rememberSaveable { mutableStateOf(initialTask?.notes ?: "") }
     var dateKey by rememberSaveable { mutableStateOf(initialTask?.dateKey ?: defaultDateKey) }
@@ -604,143 +751,269 @@ private fun TaskTileEditorSheetContent(
     var durationMinutes by rememberSaveable {
         mutableIntStateOf((initialTask?.durationMinutes?.toInt() ?: 60).coerceIn(15, 720))
     }
-    var category by rememberSaveable {
-        mutableStateOf(initialTask?.category ?: TaskCategory.FOCUS.key)
+    var selectedCategory by rememberSaveable {
+        mutableStateOf(TaskCategory.fromKey(initialTask?.category ?: TaskCategory.FOCUS.key).key)
     }
-    var colorIndex by rememberSaveable {
-        mutableIntStateOf((initialTask?.colorIndex?.toInt() ?: 0).coerceIn(0, 5))
+    var reminderMinutes by rememberSaveable {
+        mutableIntStateOf(initialTask?.reminderMinutes?.toInt() ?: -1)
     }
+    var showSheetDatePicker by rememberSaveable { mutableStateOf(false) }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ -> }
 
     val durationPresets = listOf(15, 30, 45, 60, 90, 120, 180, 240)
     val minuteQuarters = listOf(0, 15, 30, 45)
+    val quickStartHours = listOf(7, 9, 12, 15, 18, 21)
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 12.dp)
-            .padding(bottom = 28.dp)
+            .padding(vertical = 8.dp)
+            .padding(bottom = 24.dp)
     ) {
-        Text(
-            text = if (initialTask == null) "New Time Tile" else "Edit Time Tile",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Text(
-            text = "Scheduled for ${DateUtils.formatFullDateHeader(dateKey)} ($dateKey)",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
+        // Header + Compact Horizontal Date Selector
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            FilterChip(
-                selected = dateKey == DateUtils.todayDateKey(),
-                onClick = { dateKey = DateUtils.todayDateKey() },
-                label = { Text("Today") }
+            Text(
+                text = if (initialTask == null) "New Time Tile" else "Edit Time Tile",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
             )
-            FilterChip(
-                selected = dateKey == DateUtils.addDays(DateUtils.todayDateKey(), 1),
-                onClick = { dateKey = DateUtils.addDays(DateUtils.todayDateKey(), 1) },
-                label = { Text("Tomorrow") }
-            )
-            FilterChip(
-                selected = dateKey == DateUtils.addDays(dateKey, 7),
-                onClick = { dateKey = DateUtils.addDays(dateKey, 7) },
-                label = { Text("+1 Week") }
-            )
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { showSheetDatePicker = true }
+                    .testTag("sheet_date_picker_chip")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = "Pick task date",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        text = DateUtils.formatShortMonthDay(dateKey),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        OutlinedTextField(
-            value = dateKey,
-            onValueChange = { input ->
-                if (input.length <= 10) dateKey = input
-            },
-            label = { Text("Date (YYYY-MM-DD • ±10 Years Supported)") },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("task_date_input")
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = title,
-            onValueChange = { title = it },
-            label = { Text("Task or Activity Title") },
-            placeholder = { Text("e.g., Deep Focus Architecture") },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("task_title_input")
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        OutlinedTextField(
-            value = notes,
-            onValueChange = { notes = it },
-            label = { Text("Notes or Sub-steps (optional)") },
-            minLines = 2,
-            maxLines = 4,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("task_notes_input")
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Text(
-            text = "START TIME: ${String.format(java.util.Locale.US, "%02d:%02d", startHour, startMinutePart)}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
+        // Horizontal Date Quick Chips
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            OutlinedButton(onClick = { startHour = (startHour - 1).mod(24) }) {
-                Text("-1h")
+            item {
+                val todayKey = DateUtils.todayDateKey()
+                FilterChip(
+                    selected = dateKey == todayKey,
+                    onClick = { dateKey = todayKey },
+                    label = { Text("Today") }
+                )
             }
-            Text(
-                text = String.format(java.util.Locale.US, "%02d:00", startHour),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+            item {
+                val tomorrowKey = DateUtils.addDays(DateUtils.todayDateKey(), 1)
+                FilterChip(
+                    selected = dateKey == tomorrowKey,
+                    onClick = { dateKey = tomorrowKey },
+                    label = { Text("Tomorrow") }
+                )
+            }
+            item {
+                val nextWeekKey = DateUtils.addDays(DateUtils.todayDateKey(), 7)
+                FilterChip(
+                    selected = dateKey == nextWeekKey,
+                    onClick = { dateKey = nextWeekKey },
+                    label = { Text("+1 Week") }
+                )
+            }
+            item {
+                FilterChip(
+                    selected = false,
+                    onClick = { showSheetDatePicker = true },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.CalendarMonth,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = { Text("Calendar…") }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Title & Notes Inputs
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Task or Activity Title") },
+                placeholder = { Text("e.g., Deep Focus Session") },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("task_title_input")
             )
-            OutlinedButton(onClick = { startHour = (startHour + 1).mod(24) }) {
-                Text("+1h")
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = notes,
+                onValueChange = { notes = it },
+                label = { Text("Notes (optional)") },
+                maxLines = 2,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("task_notes_input")
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 1. Horizontal Scroll: Category & Fixed Color Single-Button Row [Focus, Work, Personal, Health, Break]
+        Text(
+            text = "CATEGORY",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(TaskCategory.entries, key = { it.key }) { cat ->
+                val isSelected = selectedCategory == cat.key
+                val palette = getTilePalette(cat.fixedColorIndex)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isSelected) {
+                        palette.accent.copy(alpha = 0.22f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                    },
+                    modifier = Modifier
+                        .border(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected) palette.accent else Color.Transparent,
+                            shape = RoundedCornerShape(20.dp)
+                        )
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { selectedCategory = cat.key }
+                        .testTag("category_chip_${cat.key}")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(palette.accent)
+                        )
+                        Text(
+                            text = cat.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
-            Spacer(modifier = Modifier.width(6.dp))
-            minuteQuarters.forEach { q ->
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 2. Horizontal Scroll: Start Time
+        Text(
+            text = "START TIME • ${String.format(java.util.Locale.US, "%02d:%02d", startHour, startMinutePart)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            item {
+                OutlinedButton(
+                    onClick = { startHour = (startHour - 1).mod(24) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("-1h")
+                }
+            }
+            item {
+                OutlinedButton(
+                    onClick = { startHour = (startHour + 1).mod(24) },
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text("+1h")
+                }
+            }
+            items(minuteQuarters, key = { "min_$it" }) { q ->
                 FilterChip(
                     selected = startMinutePart == q,
                     onClick = { startMinutePart = q },
                     label = { Text(String.format(java.util.Locale.US, ":%02d", q)) }
                 )
             }
+            items(quickStartHours, key = { "hr_$it" }) { hr ->
+                FilterChip(
+                    selected = startHour == hr && startMinutePart == 0,
+                    onClick = {
+                        startHour = hr
+                        startMinutePart = 0
+                    },
+                    label = { Text(String.format(java.util.Locale.US, "%02d:00", hr)) }
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        // 3. Horizontal Scroll: Duration
         Text(
-            text = "DURATION: ${DateUtils.formatDuration(durationMinutes)}",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "DURATION • ${DateUtils.formatDuration(durationMinutes)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
         Spacer(modifier = Modifier.height(6.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            durationPresets.forEach { dur ->
+            items(durationPresets, key = { it }) { dur ->
                 FilterChip(
                     selected = durationMinutes == dur,
                     onClick = { durationMinutes = dur },
@@ -749,64 +1022,61 @@ private fun TaskTileEditorSheetContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
+        // 4. Horizontal Scroll: Reminder
+        val activeReminderLabel = ReminderOption.fromMinutes(reminderMinutes).label
         Text(
-            text = "CATEGORY & TILE COLOR",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "REMINDER • $activeReminderLabel",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
         Spacer(modifier = Modifier.height(6.dp))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            TaskCategory.entries.forEach { cat ->
+            items(ReminderOption.entries, key = { it.minutesBefore }) { option ->
+                val isSelected = reminderMinutes == option.minutesBefore
                 FilterChip(
-                    selected = category == cat.key,
+                    selected = isSelected,
                     onClick = {
-                        category = cat.key
-                        colorIndex = cat.defaultColorIndex
+                        reminderMinutes = option.minutesBefore
+                        if (option != ReminderOption.NONE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val hasPerm = ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (!hasPerm) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
                     },
-                    label = { Text(cat.label) }
+                    leadingIcon = {
+                        Icon(
+                            imageVector = if (option == ReminderOption.NONE) {
+                                Icons.Default.NotificationsNone
+                            } else {
+                                Icons.Default.NotificationsActive
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    },
+                    label = { Text(option.label) },
+                    modifier = Modifier.testTag("reminder_chip_${option.minutesBefore}")
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            DaytilePalettes.forEachIndexed { idx, palette ->
-                val isSelectedColor = colorIndex == idx
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(palette.accent)
-                        .border(
-                            width = if (isSelectedColor) 3.dp else 0.dp,
-                            color = if (isSelectedColor) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                            shape = CircleShape
-                        )
-                        .clickable { colorIndex = idx },
-                    contentAlignment = Alignment.Center
-                ) {
-                    if (isSelectedColor) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Selected color",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(22.dp))
-
+        // Action Buttons
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             if (onDelete != null) {
@@ -827,19 +1097,16 @@ private fun TaskTileEditorSheetContent(
 
             Button(
                 onClick = {
-                    val validDate = if (dateKey.matches(Regex("^[0-9]{4}-[0-9]{2}-[0-9]{2}$"))) {
-                        dateKey
-                    } else {
-                        defaultDateKey
-                    }
+                    val catObj = TaskCategory.fromKey(selectedCategory)
                     onSave(
                         title.ifBlank { "Focused Time Block" },
                         notes,
-                        validDate,
+                        dateKey,
                         startHour * 60 + startMinutePart,
                         durationMinutes,
-                        category,
-                        colorIndex
+                        catObj.key,
+                        catObj.fixedColorIndex,
+                        reminderMinutes
                     )
                 },
                 modifier = Modifier
@@ -849,5 +1116,16 @@ private fun TaskTileEditorSheetContent(
                 Text(if (initialTask == null) "Create Tile" else "Save Changes")
             }
         }
+    }
+
+    if (showSheetDatePicker) {
+        CalendarDatePickerModal(
+            initialDateKey = dateKey,
+            onDismiss = { showSheetDatePicker = false },
+            onDateSelected = { picked ->
+                dateKey = picked
+                showSheetDatePicker = false
+            }
+        )
     }
 }

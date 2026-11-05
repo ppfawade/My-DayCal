@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
+import com.example.data.model.TaskCategory
 import com.example.data.repository.CloudPlannerDataSource
 import com.example.data.repository.DaytileRepository
 import com.example.data.repository.PlannerDataSource
@@ -29,17 +30,6 @@ sealed interface DataSyncState<out T> {
     data class Error(val message: String) : DataSyncState<Nothing>
 }
 
-data class ArchiveDaySummary(
-    val dateKey: String,
-    val tasks: List<DayTask>,
-    val journal: DayJournal?,
-    val completedCount: Int,
-    val totalMinutes: Int,
-    val isPast: Boolean,
-    val isToday: Boolean,
-    val isFuture: Boolean
-)
-
 data class DaytileUiState(
     val selectedDateKey: String = DateUtils.todayDateKey(),
     val todayDateKey: String = DateUtils.todayDateKey(),
@@ -47,9 +37,6 @@ data class DaytileUiState(
     val selectedDayJournal: DayJournal? = null,
     val tasksByDate: Map<String, List<DayTask>> = emptyMap(),
     val journalsByDate: Map<String, DayJournal> = emptyMap(),
-    val archiveDays: List<ArchiveDaySummary> = emptyList(),
-    val calendarYear: Int = DateUtils.currentYear(),
-    val calendarMonthZeroIndexed: Int = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH),
     val isCloudBacked: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
@@ -68,10 +55,6 @@ class DaytileViewModel(
     private val _selectedDateKey = MutableStateFlow(DateUtils.todayDateKey())
     val selectedDateKey: StateFlow<String> = _selectedDateKey.asStateFlow()
 
-    private val _calendarYear = MutableStateFlow(DateUtils.currentYear())
-    private val _calendarMonth = MutableStateFlow(
-        java.util.Calendar.getInstance().get(java.util.Calendar.MONTH)
-    )
     private val _statusBanner = MutableStateFlow<String?>(null)
 
     private val tasksFlow: StateFlow<DataSyncState<List<DayTask>>> =
@@ -114,38 +97,19 @@ class DaytileViewModel(
         _selectedDateKey,
         tasksFlow,
         journalsFlow,
-        _calendarYear,
-        combine(_calendarMonth, _statusBanner) { m, b -> m to b }
-    ) { selectedDate, tasksState, journalsState, calYear, (calMonth, banner) ->
+        _statusBanner
+    ) { selectedDate, tasksState, journalsState, banner ->
         val today = DateUtils.todayDateKey()
         val allTasks = (tasksState as? DataSyncState.Success)?.data ?: emptyList()
         val allJournals = (journalsState as? DataSyncState.Success)?.data ?: emptyList()
 
         val tasksByDate = allTasks
             .groupBy { it.dateKey }
-            .mapValues { (_, list) -> list.sortedWith(compareBy<DayTask> { it.startMinute }.thenBy { it.title }) }
+            .mapValues { (_, list) ->
+                list.sortedWith(compareBy<DayTask> { it.startMinute }.thenBy { it.title })
+            }
 
         val journalsByDate = allJournals.associateBy { it.dateKey }
-
-        val allLoggedDates = (tasksByDate.keys + journalsByDate.keys)
-            .filter { it.isNotBlank() }
-            .distinct()
-            .sortedDescending()
-
-        val archiveSummaries = allLoggedDates.map { dateKey ->
-            val dayTasks = tasksByDate[dateKey] ?: emptyList()
-            val dayJournal = journalsByDate[dateKey]
-            ArchiveDaySummary(
-                dateKey = dateKey,
-                tasks = dayTasks,
-                journal = dayJournal,
-                completedCount = dayTasks.count { it.completed },
-                totalMinutes = dayTasks.sumOf { it.durationMinutes.toInt() },
-                isPast = dateKey < today,
-                isToday = dateKey == today,
-                isFuture = dateKey > today
-            )
-        }
 
         val errorMsg = (tasksState as? DataSyncState.Error)?.message
             ?: (journalsState as? DataSyncState.Error)?.message
@@ -159,9 +123,6 @@ class DaytileViewModel(
             selectedDayJournal = journalsByDate[selectedDate],
             tasksByDate = tasksByDate,
             journalsByDate = journalsByDate,
-            archiveDays = archiveSummaries,
-            calendarYear = calYear,
-            calendarMonthZeroIndexed = calMonth,
             isCloudBacked = dataSource.isCloudBacked,
             isLoading = loading,
             errorMessage = errorMsg,
@@ -175,9 +136,6 @@ class DaytileViewModel(
 
     fun selectDate(dateKey: String) {
         _selectedDateKey.value = dateKey
-        val cal = DateUtils.parseDateKey(dateKey)
-        _calendarYear.value = cal.get(java.util.Calendar.YEAR)
-        _calendarMonth.value = cal.get(java.util.Calendar.MONTH)
     }
 
     fun stepDay(offsetDays: Int) {
@@ -187,24 +145,6 @@ class DaytileViewModel(
 
     fun jumpToToday() {
         selectDate(DateUtils.todayDateKey())
-    }
-
-    fun setCalendarYearMonth(year: Int, monthZeroIndexed: Int) {
-        val horizon = DateUtils.getTwentyYearHorizon()
-        val clampedYear = year.coerceIn(horizon.first(), horizon.last())
-        val clampedMonth = monthZeroIndexed.coerceIn(0, 11)
-        _calendarYear.value = clampedYear
-        _calendarMonth.value = clampedMonth
-    }
-
-    fun stepCalendarMonth(deltaMonths: Int) {
-        val cal = java.util.Calendar.getInstance()
-        cal.set(_calendarYear.value, _calendarMonth.value, 1)
-        cal.add(java.util.Calendar.MONTH, deltaMonths)
-        setCalendarYearMonth(
-            cal.get(java.util.Calendar.YEAR),
-            cal.get(java.util.Calendar.MONTH)
-        )
     }
 
     fun clearBanner() {
@@ -218,7 +158,9 @@ class DaytileViewModel(
         startMinute: Int,
         durationMinutes: Int,
         category: String,
-        colorIndex: Int
+        colorIndex: Int,
+        reminderMinutes: Int = -1,
+        onTaskCreated: ((String) -> Unit)? = null
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
@@ -230,9 +172,12 @@ class DaytileViewModel(
                 durationMinutes = durationMinutes,
                 category = category,
                 colorIndex = colorIndex,
-                completed = false
+                completed = false,
+                reminderMinutes = reminderMinutes
             )
-            result.onFailure { e ->
+            result.onSuccess { taskId ->
+                onTaskCreated?.invoke(taskId)
+            }.onFailure { e ->
                 _statusBanner.value = e.localizedMessage ?: "Could not create task"
             }
         }
@@ -270,7 +215,8 @@ class DaytileViewModel(
         startMinute: Int,
         durationMinutes: Int,
         category: String,
-        colorIndex: Int
+        colorIndex: Int,
+        reminderMinutes: Int = -1
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
@@ -282,7 +228,8 @@ class DaytileViewModel(
                     startMinute = startMinute.coerceIn(0, 1439).toLong(),
                     durationMinutes = durationMinutes.coerceIn(15, 720).toLong(),
                     category = category,
-                    colorIndex = colorIndex.coerceIn(0, 5).toLong()
+                    colorIndex = colorIndex.coerceIn(0, 5).toLong(),
+                    reminderMinutes = reminderMinutes.coerceIn(-1, 1440).toLong()
                 )
             ).onFailure { e ->
                 _statusBanner.value = e.localizedMessage ?: "Failed to update task"
@@ -318,7 +265,7 @@ class DaytileViewModel(
                 _statusBanner.value = if (dataSource.isCloudBacked) {
                     "Daily reflection synced to cloud"
                 } else {
-                    "Daily reflection saved to device"
+                    "Daily reflection saved"
                 }
             }.onFailure { e ->
                 _statusBanner.value = e.localizedMessage ?: "Failed to save reflection"
@@ -334,8 +281,9 @@ class DaytileViewModel(
                 notes = "Prioritize top 3 outcomes for the day with zero notifications.",
                 startMinute = 8 * 60 + 30,
                 durationMinutes = 90,
-                category = "focus",
-                colorIndex = 0
+                category = TaskCategory.FOCUS.key,
+                colorIndex = TaskCategory.FOCUS.fixedColorIndex,
+                reminderMinutes = 10
             )
             dataSource.createTask(
                 dateKey = dateKey,
@@ -343,19 +291,21 @@ class DaytileViewModel(
                 notes = "Sunlight exposure and 20-minute brisk walk outside.",
                 startMinute = 12 * 60 + 30,
                 durationMinutes = 45,
-                category = "health",
-                colorIndex = 3
+                category = TaskCategory.HEALTH.key,
+                colorIndex = TaskCategory.HEALTH.fixedColorIndex,
+                reminderMinutes = 5
             )
             dataSource.createTask(
                 dateKey = dateKey,
-                title = "Evening Review & Next-Day Prep",
-                notes = "Log daily reflection and queue tomorrow's first tile.",
-                startMinute = 17 * 60,
-                durationMinutes = 60,
-                category = "routine",
-                colorIndex = 4
+                title = "Afternoon Recharge & Tea",
+                notes = "Step away from screens and reset attention.",
+                startMinute = 16 * 60,
+                durationMinutes = 30,
+                category = TaskCategory.BREAK.key,
+                colorIndex = TaskCategory.BREAK.fixedColorIndex,
+                reminderMinutes = 0
             )
-            _statusBanner.value = "Added 3 sample timeline tiles for $dateKey"
+            _statusBanner.value = "Added 3 sample timeline tiles"
         }
     }
 

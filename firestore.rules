@@ -29,7 +29,7 @@ service cloud.firestore {
 
     function isValidCategory(cat) {
       return cat is string && cat.size() <= 20 &&
-        (cat == 'focus' || cat == 'work' || cat == 'personal' || cat == 'health' || cat == 'routine' || cat == 'creative');
+        (cat == 'focus' || cat == 'work' || cat == 'personal' || cat == 'health' || cat == 'break' || cat == 'routine' || cat == 'creative');
     }
 
     // 3. Entity Validation Blueprints
@@ -42,7 +42,7 @@ service cloud.firestore {
              data.keys().hasOnly([
                'userId', 'dateKey', 'title', 'notes',
                'startMinute', 'durationMinutes', 'category',
-               'colorIndex', 'completed', 'createdAt', 'updatedAt'
+               'colorIndex', 'reminderMinutes', 'completed', 'createdAt', 'updatedAt'
              ]) &&
              data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
              data.userId == request.auth.uid &&
@@ -53,6 +53,7 @@ service cloud.firestore {
              data.durationMinutes is int && data.durationMinutes >= 15 && data.durationMinutes <= 720 &&
              isValidCategory(data.category) &&
              data.colorIndex is int && data.colorIndex >= 0 && data.colorIndex <= 5 &&
+             (!('reminderMinutes' in data) || (data.reminderMinutes is int && data.reminderMinutes >= -1 && data.reminderMinutes <= 1440)) &&
              data.completed is bool &&
              data.createdAt is timestamp && data.createdAt <= request.time &&
              data.updatedAt is timestamp && data.updatedAt <= request.time;
@@ -102,11 +103,11 @@ service cloud.firestore {
                        incoming().userId == existing().userId &&
                        incoming().createdAt == existing().createdAt &&
                        (
-                         // Action: Edit task details, schedule, or completion status
+                         // Action: Edit task details, schedule, reminder, or completion status
                          incoming().diff(existing()).affectedKeys().hasOnly([
                            'dateKey', 'title', 'notes', 'startMinute',
                            'durationMinutes', 'category', 'colorIndex',
-                           'completed', 'updatedAt'
+                           'reminderMinutes', 'completed', 'updatedAt'
                          ])
                        );
 

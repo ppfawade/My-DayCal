@@ -1,15 +1,12 @@
 <resources>
     <string name="app_name">My DayCal</string>
-    <string name="tagline">Minimalist daily timeline, journal &amp; 20-year calendar.</string>
+    <string name="tagline">Minimalist daily timeline &amp; reflection journal.</string>
     <string name="sign_in_google">Sign in with Google</string>
     <string name="continue_local_storage">Continue on Local Storage</string>
     <string name="local_storage_note">No account required • Stored privately on this device</string>
     <string name="sign_out">Sign Out</string>
     <string name="sync_badge">Google Cloud Sync Active</string>
     <string name="local_badge">Local Storage</string>
-    <string name="tab_today">Day View</string>
-    <string name="tab_archive">Past Archive</string>
-    <string name="tab_calendar">20-Year Calendar</string>
     <string name="btn_add_tile">New Time Tile</string>
     <string name="btn_jump_today">Today</string>
     <string name="journal_section_title">Daily Reflection &amp; Journal</string>
@@ -18,8 +15,4 @@
     <string name="btn_save_journal">Save Reflection</string>
     <string name="empty_day_title">Open Canvas for This Day</string>
     <string name="empty_day_subtitle">Tap any hour slot on the 24-hour timeline or press + to block your time.</string>
-    <string name="archive_title">Past Days Archive</string>
-    <string name="archive_subtitle">Every logged day, completed tile, and reflection in reverse chronological order.</string>
-    <string name="calendar_title">Multi-Year Horizon (±10 Years)</string>
-    <string name="calendar_subtitle">Jump to any day from 10 years ago to 10 years ahead to inspect history or schedule future tasks.</string>
 </resources>

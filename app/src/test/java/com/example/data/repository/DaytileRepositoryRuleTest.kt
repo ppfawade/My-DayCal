@@ -23,11 +23,12 @@ class DaytileRepositoryRuleTest : FirestoreEmulatorTestBase() {
             repository.createTask(
                 dateKey = "2026-11-05",
                 title = "Morning Architecture Block",
-                notes = "Design 20-year calendar jump grid",
+                notes = "Design timeline tile layout",
                 startMinute = 540,
                 durationMinutes = 90,
-                category = "focus",
-                colorIndex = 0
+                category = "break",
+                colorIndex = 4,
+                reminderMinutes = 15
             )
         }
         assertTrue("Expected task creation to succeed: ${createResult.exceptionOrNull()}", createResult.isSuccess)
@@ -37,7 +38,14 @@ class DaytileRepositoryRuleTest : FirestoreEmulatorTestBase() {
         val emittedTasks = withTimeout(FLOW_TIMEOUT_MS) {
             repository.observeTasks(aliceUid).first { list -> list.any { it.id == taskId } }
         }
-        assertTrue(emittedTasks.any { it.id == taskId && it.title == "Morning Architecture Block" })
+        assertTrue(
+            emittedTasks.any {
+                it.id == taskId &&
+                    it.title == "Morning Architecture Block" &&
+                    it.category == "break" &&
+                    it.reminderMinutes == 15L
+            }
+        )
     }
 
     @Test

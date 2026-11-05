@@ -52,6 +52,7 @@ function validTaskPayload(userId, overrides = {}) {
     category: "focus",
     colorIndex: 0,
     completed: false,
+    reminderMinutes: 10,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -63,7 +64,7 @@ function validJournalPayload(userId, dateKey = "2026-11-05", overrides = {}) {
   return {
     userId,
     dateKey,
-    headline: "Shipped the 20-year multi-year calendar",
+    headline: "Productive focus day",
     content: "Today felt productive and calm. Completed all morning blocks.",
     moodScore: 5,
     createdAt: now,
@@ -100,7 +101,7 @@ test("Unauthenticated user: cannot read or create tasks or journals", async () =
   );
 });
 
-test("Authenticated user: can create, get, list, update, and delete own task", async () => {
+test("Authenticated user: can create, get, list, update, and delete own task (including break category and reminderMinutes)", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const taskRef = aliceDb
     .collection("users")
@@ -108,7 +109,7 @@ test("Authenticated user: can create, get, list, update, and delete own task", a
     .collection("tasks")
     .doc("task_1");
 
-  const payload = validTaskPayload(ALICE_UID);
+  const payload = validTaskPayload(ALICE_UID, { category: "break", colorIndex: 4, reminderMinutes: 15 });
   await assertSucceeds(taskRef.set(payload));
   await assertSucceeds(taskRef.get());
   await assertSucceeds(
@@ -125,7 +126,8 @@ test("Authenticated user: can create, get, list, update, and delete own task", a
     taskRef.set({
       ...payload,
       completed: true,
-      title: "Updated Deep Work",
+      title: "Updated Break Block",
+      reminderMinutes: -1,
       updatedAt: new Date(),
     })
   );
@@ -186,6 +188,11 @@ test("Red Team Shadow Update & Value Poisoning: rejects ghost fields and invalid
   // Reject invalid startMinute (> 1439)
   await assertFails(
     taskRef.set(validTaskPayload(ALICE_UID, { startMinute: 1500 }))
+  );
+
+  // Reject invalid reminderMinutes (> 1440)
+  await assertFails(
+    taskRef.set(validTaskPayload(ALICE_UID, { reminderMinutes: 2000 }))
   );
 
   // Reject identity spoofing (userId != auth.uid)

@@ -95,6 +95,7 @@ class DaytileRepository(
         durationMinutes: Int = 60,
         category: String = "focus",
         colorIndex: Int = 0,
+        reminderMinutes: Int = -1,
         completed: Boolean = false
     ): Result<String> = runCatching {
         val uid = requireUserId()
@@ -110,6 +111,7 @@ class DaytileRepository(
             durationMinutes = durationMinutes.coerceIn(15, 720).toLong(),
             category = category,
             colorIndex = colorIndex.coerceIn(0, 5).toLong(),
+            reminderMinutes = reminderMinutes.coerceIn(-1, 1440).toLong(),
             completed = completed,
             createdAt = null,
             updatedAt = null
@@ -139,6 +141,7 @@ class DaytileRepository(
                 startMinute = task.startMinute.coerceIn(0L, 1439L),
                 durationMinutes = task.durationMinutes.coerceIn(15L, 720L),
                 colorIndex = task.colorIndex.coerceIn(0L, 5L),
+                reminderMinutes = task.reminderMinutes.coerceIn(-1L, 1440L),
                 createdAt = preservedCreatedAt,
                 updatedAt = null
             )

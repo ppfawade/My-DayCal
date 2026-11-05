@@ -26,6 +26,7 @@ data class LocalTaskEntity(
     val durationMinutes: Long,
     val category: String,
     val colorIndex: Long,
+    val reminderMinutes: Long = -1L,
     val completed: Boolean,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long
@@ -40,6 +41,7 @@ data class LocalTaskEntity(
         durationMinutes = durationMinutes,
         category = category,
         colorIndex = colorIndex,
+        reminderMinutes = reminderMinutes,
         completed = completed,
         createdAt = Timestamp(Date(createdAtEpochMillis)),
         updatedAt = Timestamp(Date(updatedAtEpochMillis))
@@ -90,7 +92,7 @@ interface LocalDaytileDao {
 
 @Database(
     entities = [LocalTaskEntity::class, LocalJournalEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class LocalDaytileDatabase : RoomDatabase() {

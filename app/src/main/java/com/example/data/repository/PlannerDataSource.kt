@@ -22,6 +22,7 @@ interface PlannerDataSource {
         durationMinutes: Int = 60,
         category: String = "focus",
         colorIndex: Int = 0,
+        reminderMinutes: Int = -1,
         completed: Boolean = false
     ): Result<String>
 
@@ -56,6 +57,7 @@ class CloudPlannerDataSource(
         durationMinutes: Int,
         category: String,
         colorIndex: Int,
+        reminderMinutes: Int,
         completed: Boolean
     ): Result<String> = repository.createTask(
         dateKey = dateKey,
@@ -65,6 +67,7 @@ class CloudPlannerDataSource(
         durationMinutes = durationMinutes,
         category = category,
         colorIndex = colorIndex,
+        reminderMinutes = reminderMinutes,
         completed = completed
     )
 
@@ -108,6 +111,7 @@ class LocalPlannerDataSource(
         durationMinutes: Int,
         category: String,
         colorIndex: Int,
+        reminderMinutes: Int,
         completed: Boolean
     ): Result<String> = runCatching {
         val now = System.currentTimeMillis()
@@ -121,6 +125,7 @@ class LocalPlannerDataSource(
             durationMinutes = durationMinutes.coerceIn(15, 720).toLong(),
             category = category,
             colorIndex = colorIndex.coerceIn(0, 5).toLong(),
+            reminderMinutes = reminderMinutes.coerceIn(-1, 1440).toLong(),
             completed = completed,
             createdAtEpochMillis = now,
             updatedAtEpochMillis = now
@@ -141,6 +146,7 @@ class LocalPlannerDataSource(
             durationMinutes = task.durationMinutes.coerceIn(15L, 720L),
             category = task.category,
             colorIndex = task.colorIndex.coerceIn(0L, 5L),
+            reminderMinutes = task.reminderMinutes.coerceIn(-1L, 1440L),
             completed = task.completed,
             createdAtEpochMillis = createdMillis,
             updatedAtEpochMillis = now
