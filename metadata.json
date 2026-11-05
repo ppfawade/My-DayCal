@@ -1,6 +1,8 @@
 {
-  "name": "Daytile",
+  "name": "My DayCal",
   "description": "Fast, minimalist daily timeline planner, journal, and 20-year multi-year calendar archive with Google Cloud sync.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -33,7 +34,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -80,9 +83,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.example.data.local.LocalDaytileDatabase
 import com.example.data.model.DayTask
 import com.example.data.model.TaskCategory
+import com.example.data.repository.CloudPlannerDataSource
 import com.example.data.repository.DaytileRepository
+import com.example.data.repository.LocalPlannerDataSource
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
 import com.example.ui.screens.ArchiveScreen
@@ -100,6 +106,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+
+private const val PREFS_NAME = "my_daycal_prefs"
+private const val KEY_LOCAL_MODE = "use_local_storage_mode"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -128,36 +137,94 @@ enum class DaytileDestination(val titleRes: Int) {
 }
 
 @Composable
-fun DaytileRootApp(auth: FirebaseAuth = Firebase.auth) {
-    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
-    val user = currentUser
+fun DaytileRootApp() {
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    var isInitialized by remember { mutableStateOf(false) }
+    var currentUser by remember { mutableStateOf<FirebaseUser?>(null) }
+    var isLocalStorageMode by remember {
+        mutableStateOf(prefs.getBoolean(KEY_LOCAL_MODE, false))
+    }
 
-    if (user == null) {
-        AuthScreen(onAuthSuccess = {})
-    } else {
-        DaytileAuthenticatedShell(
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.android.awaitFrame()
+        val auth = Firebase.auth
+        currentUser = auth.currentUser
+        isInitialized = true
+        auth.authStateFlow().collect { user ->
+            currentUser = user
+            if (user != null) {
+                isLocalStorageMode = false
+                prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
+            }
+        }
+    }
+
+    val user = currentUser
+    if (!isInitialized) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {}
+    } else if (user != null) {
+        DaytilePlannerShell(
+            sessionKey = "cloud_${user.uid}",
+            isCloudMode = true,
             currentUserId = user.uid,
-            userEmail = user.email ?: "Signed in with Google"
+            userLabel = user.email ?: "Signed in with Google",
+            onExitCurrentMode = {}
+        )
+    } else if (isLocalStorageMode) {
+        DaytilePlannerShell(
+            sessionKey = "local_device_mode",
+            isCloudMode = false,
+            currentUserId = "local_user",
+            userLabel = "Local Device Storage (Offline)",
+            onExitCurrentMode = {
+                prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
+                isLocalStorageMode = false
+            }
+        )
+    } else {
+        AuthScreen(
+            onAuthSuccess = {
+                currentUser = Firebase.auth.currentUser
+            },
+            onContinueWithLocalStorage = {
+                prefs.edit().putBoolean(KEY_LOCAL_MODE, true).apply()
+                isLocalStorageMode = true
+            }
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DaytileAuthenticatedShell(
+fun DaytilePlannerShell(
+    sessionKey: String,
+    isCloudMode: Boolean,
     currentUserId: String,
-    userEmail: String
+    userLabel: String,
+    onExitCurrentMode: () -> Unit
 ) {
     val viewModel: DaytileViewModel = viewModel(
-        key = currentUserId,
+        key = sessionKey,
         factory = viewModelFactory {
             initializer {
                 val app = checkNotNull(this[APPLICATION_KEY]) {
                     "APPLICATION_KEY missing from CreationExtras"
                 }
-                val databaseId = app.getString(R.string.firestore_database_id)
-                val db = FirebaseFirestore.getInstance(databaseId)
-                DaytileViewModel(DaytileRepository(db), currentUserId)
+                val dataSource = if (isCloudMode) {
+                    val databaseId = app.getString(R.string.firestore_database_id)
+                    val db = FirebaseFirestore.getInstance(databaseId)
+                    CloudPlannerDataSource(DaytileRepository(db), currentUserId)
+                } else {
+                    val localDb = LocalDaytileDatabase.getInstance(app)
+                    LocalPlannerDataSource(localDb.daytileDao())
+                }
+                DaytileViewModel(dataSource)
             }
         }
     )
@@ -165,7 +232,6 @@ fun DaytileAuthenticatedShell(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val credentialManager = remember(context) { CredentialManager.create(context) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     var currentDestination by rememberSaveable { mutableStateOf(DaytileDestination.DAY_VIEW) }
@@ -173,9 +239,8 @@ fun DaytileAuthenticatedShell(
     var editingTask by remember { mutableStateOf<DayTask?>(null) }
     var presetDateForNewTask by rememberSaveable { mutableStateOf(uiState.selectedDateKey) }
     var presetStartMinute by rememberSaveable { mutableIntStateOf(9 * 60) }
-    var showCloudSyncDialog by rememberSaveable { mutableStateOf(false) }
+    var showStorageInfoDialog by rememberSaveable { mutableStateOf(false) }
 
-    // Secondary screen BackHandler per Android guidelines
     BackHandler(enabled = currentDestination != DaytileDestination.DAY_VIEW) {
         currentDestination = DaytileDestination.DAY_VIEW
     }
@@ -205,47 +270,72 @@ fun DaytileAuthenticatedShell(
                         )
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            color = if (isCloudMode) {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
+                            },
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
-                                .clickable { showCloudSyncDialog = true }
-                                .testTag("cloud_sync_status_badge")
+                                .clickable { showStorageInfoDialog = true }
+                                .testTag("storage_mode_badge")
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.CloudDone,
-                                    contentDescription = "Cloud Sync Info",
-                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    imageVector = if (isCloudMode) Icons.Default.CloudDone else Icons.Default.PhoneAndroid,
+                                    contentDescription = "Storage Mode Info",
+                                    tint = if (isCloudMode) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Synced",
+                                    text = if (isCloudMode) "Synced" else "Local",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    color = if (isCloudMode) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
                                 )
                             }
                         }
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            signOutUser(
-                                credentialManager = credentialManager,
-                                onSignOutComplete = {},
-                                scope = scope
+                    if (isCloudMode) {
+                        IconButton(
+                            onClick = {
+                                val credentialManager = CredentialManager.create(context)
+                                signOutUser(
+                                    credentialManager = credentialManager,
+                                    onSignOutComplete = onExitCurrentMode,
+                                    scope = scope
+                                )
+                            },
+                            modifier = Modifier.testTag("sign_out_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Logout,
+                                contentDescription = stringResource(id = R.string.sign_out)
                             )
-                        },
-                        modifier = Modifier.testTag("sign_out_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Logout,
-                            contentDescription = stringResource(id = R.string.sign_out)
-                        )
+                        }
+                    } else {
+                        IconButton(
+                            onClick = onExitCurrentMode,
+                            modifier = Modifier.testTag("switch_to_cloud_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudQueue,
+                                contentDescription = "Switch to Google Cloud Sync"
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -421,36 +511,62 @@ fun DaytileAuthenticatedShell(
         }
     }
 
-    if (showCloudSyncDialog) {
+    if (showStorageInfoDialog) {
         val dbId = context.getString(R.string.firestore_database_id)
         AlertDialog(
-            onDismissRequest = { showCloudSyncDialog = false },
-            title = { Text("Google Cloud Sync Active") },
+            onDismissRequest = { showStorageInfoDialog = false },
+            title = {
+                Text(if (isCloudMode) "Google Cloud Sync Active" else "Local Device Storage Mode")
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Your timeline tiles, future plans, and past journal archives sync automatically in real time using free Google Firebase services.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Account: $userEmail",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Firestore Paths:\n• /users/$currentUserId/tasks\n• /users/$currentUserId/journals",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Database ID:\n$dbId",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    if (isCloudMode) {
+                        Text(
+                            text = "Your timeline tiles, future plans, and past journal archives sync automatically in real time using free Google Firebase services.",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Account: $userLabel",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Firestore Paths:\n• /users/$currentUserId/tasks\n• /users/$currentUserId/journals",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Database ID:\n$dbId",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "You are using My DayCal offline without an account. All timeline tiles and daily reflections are stored locally on this device in a Room SQLite database (my_daycal_local.db).",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Want to sync across devices? Tap 'Sign in with Google' below at any time.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             },
+            dismissButton = if (!isCloudMode) {
+                {
+                    TextButton(
+                        onClick = {
+                            showStorageInfoDialog = false
+                            onExitCurrentMode()
+                        }
+                    ) {
+                        Text("Sign in with Google")
+                    }
+                }
+            } else null,
             confirmButton = {
-                TextButton(onClick = { showCloudSyncDialog = false }) {
+                TextButton(onClick = { showStorageInfoDialog = false }) {
                     Text("Done")
                 }
             }
@@ -518,7 +634,6 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Quick Date Offset Selector (Today, Tomorrow, +7d, or custom YYYY-MM-DD)
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth()
@@ -582,7 +697,6 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Start Time Selector
         Text(
             text = "START TIME: ${String.format(java.util.Locale.US, "%02d:%02d", startHour, startMinutePart)}",
             style = MaterialTheme.typography.labelLarge,
@@ -616,7 +730,6 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Duration Selector
         Text(
             text = "DURATION: ${DateUtils.formatDuration(durationMinutes)}",
             style = MaterialTheme.typography.labelLarge,
@@ -638,7 +751,6 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Category Selector
         Text(
             text = "CATEGORY & TILE COLOR",
             style = MaterialTheme.typography.labelLarge,

@@ -5,16 +5,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
+import com.example.data.repository.CloudPlannerDataSource
 import com.example.data.repository.DaytileRepository
+import com.example.data.repository.PlannerDataSource
 import com.example.util.DateUtils
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -46,15 +50,20 @@ data class DaytileUiState(
     val archiveDays: List<ArchiveDaySummary> = emptyList(),
     val calendarYear: Int = DateUtils.currentYear(),
     val calendarMonthZeroIndexed: Int = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH),
+    val isCloudBacked: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val statusBanner: String? = null
 )
 
 class DaytileViewModel(
-    private val repository: DaytileRepository,
-    private val currentUserId: String
+    private val dataSource: PlannerDataSource
 ) : ViewModel() {
+
+    constructor(
+        repository: DaytileRepository,
+        currentUserId: String
+    ) : this(CloudPlannerDataSource(repository, currentUserId))
 
     private val _selectedDateKey = MutableStateFlow(DateUtils.todayDateKey())
     val selectedDateKey: StateFlow<String> = _selectedDateKey.asStateFlow()
@@ -66,7 +75,7 @@ class DaytileViewModel(
     private val _statusBanner = MutableStateFlow<String?>(null)
 
     private val tasksFlow: StateFlow<DataSyncState<List<DayTask>>> =
-        repository.observeTasks(currentUserId)
+        dataSource.observeTasks()
             .map<List<DayTask>, DataSyncState<List<DayTask>>> { DataSyncState.Success(it) }
             .catch { error ->
                 val firestoreError = generateSequence(error) { it.cause }
@@ -75,7 +84,7 @@ class DaytileViewModel(
                 if (firestoreError == null && error is CancellationException) throw error
                 val rootError = firestoreError ?: error
                 Log.w(TAG, "Error observing tasks", rootError)
-                emit(DataSyncState.Error(rootError.message ?: "Failed to sync tasks"))
+                emit(DataSyncState.Error(rootError.message ?: "Failed to load tasks"))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -84,7 +93,7 @@ class DaytileViewModel(
             )
 
     private val journalsFlow: StateFlow<DataSyncState<List<DayJournal>>> =
-        repository.observeJournals(currentUserId)
+        dataSource.observeJournals()
             .map<List<DayJournal>, DataSyncState<List<DayJournal>>> { DataSyncState.Success(it) }
             .catch { error ->
                 val firestoreError = generateSequence(error) { it.cause }
@@ -93,7 +102,7 @@ class DaytileViewModel(
                 if (firestoreError == null && error is CancellationException) throw error
                 val rootError = firestoreError ?: error
                 Log.w(TAG, "Error observing journals", rootError)
-                emit(DataSyncState.Error(rootError.message ?: "Failed to sync journals"))
+                emit(DataSyncState.Error(rootError.message ?: "Failed to load journals"))
             }
             .stateIn(
                 scope = viewModelScope,
@@ -153,14 +162,15 @@ class DaytileViewModel(
             archiveDays = archiveSummaries,
             calendarYear = calYear,
             calendarMonthZeroIndexed = calMonth,
+            isCloudBacked = dataSource.isCloudBacked,
             isLoading = loading,
             errorMessage = errorMsg,
             statusBanner = banner
         )
-    }.stateIn(
+    }.flowOn(Dispatchers.Default).stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-        initialValue = DaytileUiState()
+        initialValue = DaytileUiState(isCloudBacked = dataSource.isCloudBacked)
     )
 
     fun selectDate(dateKey: String) {
@@ -212,7 +222,7 @@ class DaytileViewModel(
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
-            val result = repository.createTask(
+            val result = dataSource.createTask(
                 dateKey = dateKey,
                 title = title,
                 notes = notes,
@@ -230,7 +240,7 @@ class DaytileViewModel(
 
     fun toggleTaskCompleted(task: DayTask) {
         viewModelScope.launch {
-            repository.updateTask(task.copy(completed = !task.completed))
+            dataSource.updateTask(task.copy(completed = !task.completed))
                 .onFailure { e ->
                     _statusBanner.value = e.localizedMessage ?: "Failed to update task"
                 }
@@ -241,7 +251,7 @@ class DaytileViewModel(
         val clampedStart = newStartMinute.coerceIn(0, 1425)
         val clampedDuration = newDurationMinutes.coerceIn(15, 720)
         viewModelScope.launch {
-            repository.updateTask(
+            dataSource.updateTask(
                 task.copy(
                     startMinute = clampedStart.toLong(),
                     durationMinutes = clampedDuration.toLong()
@@ -264,7 +274,7 @@ class DaytileViewModel(
     ) {
         if (title.isBlank()) return
         viewModelScope.launch {
-            repository.updateTask(
+            dataSource.updateTask(
                 task.copy(
                     title = title,
                     notes = notes,
@@ -282,7 +292,7 @@ class DaytileViewModel(
 
     fun deleteTask(taskId: String) {
         viewModelScope.launch {
-            repository.deleteTask(taskId)
+            dataSource.deleteTask(taskId)
                 .onFailure { e ->
                     _statusBanner.value = e.localizedMessage ?: "Failed to delete task"
                 }
@@ -297,7 +307,7 @@ class DaytileViewModel(
     ) {
         val existing = uiState.value.journalsByDate[dateKey]
         viewModelScope.launch {
-            val result = repository.saveJournal(
+            val result = dataSource.saveJournal(
                 dateKey = dateKey,
                 headline = headline,
                 content = content,
@@ -305,7 +315,11 @@ class DaytileViewModel(
                 existingCreatedAt = existing?.createdAt
             )
             result.onSuccess {
-                _statusBanner.value = "Daily reflection synced to cloud"
+                _statusBanner.value = if (dataSource.isCloudBacked) {
+                    "Daily reflection synced to cloud"
+                } else {
+                    "Daily reflection saved to device"
+                }
             }.onFailure { e ->
                 _statusBanner.value = e.localizedMessage ?: "Failed to save reflection"
             }
@@ -314,7 +328,7 @@ class DaytileViewModel(
 
     fun populateSampleDay(dateKey: String = _selectedDateKey.value) {
         viewModelScope.launch {
-            repository.createTask(
+            dataSource.createTask(
                 dateKey = dateKey,
                 title = "Morning Deep Work & Planning",
                 notes = "Prioritize top 3 outcomes for the day with zero notifications.",
@@ -323,7 +337,7 @@ class DaytileViewModel(
                 category = "focus",
                 colorIndex = 0
             )
-            repository.createTask(
+            dataSource.createTask(
                 dateKey = dateKey,
                 title = "Midday Walk & Mobility",
                 notes = "Sunlight exposure and 20-minute brisk walk outside.",
@@ -332,7 +346,7 @@ class DaytileViewModel(
                 category = "health",
                 colorIndex = 3
             )
-            repository.createTask(
+            dataSource.createTask(
                 dateKey = dateKey,
                 title = "Evening Review & Next-Day Prep",
                 notes = "Log daily reflection and queue tomorrow's first tile.",

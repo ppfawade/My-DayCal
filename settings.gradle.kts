@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Daytile"
+rootProject.name = "My DayCal"
 
 include(":app")

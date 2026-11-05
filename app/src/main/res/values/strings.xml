@@ -1,9 +1,12 @@
 <resources>
-    <string name="app_name">Daytile</string>
-    <string name="tagline">Minimalist Daily Timeline, Journal &amp; 20-Year Archive</string>
+    <string name="app_name">My DayCal</string>
+    <string name="tagline">Minimalist daily timeline, journal &amp; 20-year calendar.</string>
     <string name="sign_in_google">Sign in with Google</string>
+    <string name="continue_local_storage">Continue on Local Storage</string>
+    <string name="local_storage_note">No account required • Stored privately on this device</string>
     <string name="sign_out">Sign Out</string>
     <string name="sync_badge">Google Cloud Sync Active</string>
+    <string name="local_badge">Local Storage</string>
     <string name="tab_today">Day View</string>
     <string name="tab_archive">Past Archive</string>
     <string name="tab_calendar">20-Year Calendar</string>

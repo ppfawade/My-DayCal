@@ -18,7 +18,7 @@ class ExampleRobolectricTest {
     fun `read string from context and verify 20 year calendar horizon`() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appName = context.getString(R.string.app_name)
-        assertEquals("Daytile", appName)
+        assertEquals("My DayCal", appName)
 
         val horizon = DateUtils.getTwentyYearHorizon()
         val currentYear = DateUtils.currentYear()
