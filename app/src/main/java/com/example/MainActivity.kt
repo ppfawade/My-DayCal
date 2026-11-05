@@ -163,15 +163,19 @@ fun DaytileRootApp() {
 
     LaunchedEffect(Unit) {
         kotlinx.coroutines.android.awaitFrame()
-        val auth = Firebase.auth
-        currentUser = auth.currentUser
-        isInitialized = true
-        auth.authStateFlow().collect { user ->
-            currentUser = user
-            if (user != null) {
-                isLocalStorageMode = false
-                prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
+        val auth = runCatching { Firebase.auth }.getOrNull()
+        if (auth != null) {
+            currentUser = auth.currentUser
+            isInitialized = true
+            auth.authStateFlow().collect { user ->
+                currentUser = user
+                if (user != null) {
+                    isLocalStorageMode = false
+                    prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
+                }
             }
+        } else {
+            isInitialized = true
         }
     }
 
@@ -203,7 +207,7 @@ fun DaytileRootApp() {
     } else {
         AuthScreen(
             onAuthSuccess = {
-                currentUser = Firebase.auth.currentUser
+                currentUser = runCatching { Firebase.auth.currentUser }.getOrNull()
             },
             onContinueWithLocalStorage = {
                 prefs.edit().putBoolean(KEY_LOCAL_MODE, true).apply()

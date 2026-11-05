@@ -77,13 +77,18 @@ fun attemptAutoSignIn(
     onUnauthenticated: () -> Unit,
     scope: CoroutineScope
 ) {
-    if (Firebase.auth.currentUser != null) {
+    val existingUser = runCatching { Firebase.auth.currentUser }.getOrNull()
+    if (existingUser != null) {
         onAuthSuccess()
         return
     }
     val clientId = try {
         context.getString(R.string.default_web_client_id)
     } catch (e: Exception) {
+        onUnauthenticated()
+        return
+    }
+    if (clientId.isBlank() || clientId.startsWith("000000000000")) {
         onUnauthenticated()
         return
     }
@@ -130,6 +135,10 @@ fun onGoogleSignInClicked(
         onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
         return
     }
+    if (clientId.isBlank() || clientId.startsWith("000000000000")) {
+        onAuthError("Google Cloud Sync is not configured in this standalone APK build. Tap 'Continue on Local Storage' below to use the app offline.")
+        return
+    }
 
     val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
     val request = GetCredentialRequest.Builder()
@@ -164,7 +173,7 @@ fun signOutUser(
     onSignOutComplete: () -> Unit,
     scope: CoroutineScope
 ) {
-    Firebase.auth.signOut()
+    runCatching { Firebase.auth.signOut() }
     scope.launch {
         try {
             credentialManager.clearCredentialState(ClearCredentialStateRequest())

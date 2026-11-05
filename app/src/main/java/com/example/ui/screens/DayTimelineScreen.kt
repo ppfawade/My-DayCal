@@ -31,7 +31,7 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
@@ -1221,7 +1221,7 @@ private fun DailyJournalSection(
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = Icons.Default.MenuBook,
+                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
                                 contentDescription = null,
                                 tint = CyberTeal,
                                 modifier = Modifier.size(20.dp)

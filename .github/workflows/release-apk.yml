@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: "temurin"
           java-version: "21"
@@ -54,9 +54,11 @@ jobs:
             "$CMDLINE_BIN" --sdk_root="$SDK_ROOT" "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" || true
           fi
 
-      - name: Prepare .env & Signing Keystores (Debug + Release Upload Alias)
+      - name: Prepare .env, Firebase Config & Signing Keystores
+        env:
+          GOOGLE_SERVICES_SECRET: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
-          # Ensure .env exists for Secrets Gradle Plugin
+          # 1. Ensure .env exists for Secrets Gradle Plugin
           if [ ! -f .env ]; then
             if [ -f .env.example ]; then
               cp .env.example .env
@@ -65,7 +67,56 @@ jobs:
             fi
           fi
 
-          # 1. Debug keystore (alias: androiddebugkey)
+          # 2. Ensure app/google-services.json exists (AI Studio strips it on GitHub push)
+          if [ ! -f app/google-services.json ]; then
+            if [ -n "$GOOGLE_SERVICES_SECRET" ]; then
+              echo "$GOOGLE_SERVICES_SECRET" > app/google-services.json
+            else
+              cat << 'EOF' > app/google-services.json
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "my-daycal-local",
+              "storage_bucket": "my-daycal-local.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.daytile.kxpqzm"
+                  }
+                },
+                "oauth_client": [
+                  {
+                    "client_id": "000000000000-local-only",
+                    "client_type": 3
+                  }
+                ],
+                "api_key": [
+                  {
+                    "current_key": "000000000000000000000000000000000000000"
+                  }
+                ],
+                "services": {
+                  "appinvite_service": {
+                    "other_platform_oauth_client": [
+                      {
+                        "client_id": "000000000000-local-only",
+                        "client_type": 3
+                      }
+                    ]
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+            fi
+          fi
+
+          # 3. Debug keystore (alias: androiddebugkey)
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           elif [ ! -f debug.keystore ]; then
@@ -77,7 +128,7 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-          # 2. Release keystore (alias: upload, required by app/build.gradle.kts release signingConfig)
+          # 4. Release keystore (alias: upload, required by app/build.gradle.kts release signingConfig)
           rm -f my-upload-key.jks
           keytool -genkeypair -v \
             -keystore my-upload-key.jks \
@@ -91,8 +142,13 @@ jobs:
           KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
           STORE_PASSWORD: android
           KEY_PASSWORD: android
+          GRADLE_OPTS: "-Djava.awt.headless=true"
         run: |
-          gradle :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+          gradle :app:assembleDebug :app:assembleRelease \
+            -Pkotlin.compiler.execution.strategy=daemon \
+            -Djava.awt.headless=true \
+            --no-daemon \
+            --stacktrace
 
       - name: Package Versioned APK Files
         id: prepare_apk
@@ -133,6 +189,7 @@ jobs:
 
           ### Highlights
           - **Focused Single-Day Timeline**: Calendar Week (\`CW\`) + \`Mon\`–\`Fri\` strip, top-bar \`MMM dd\` calendar date picker, and \`Focus\` / \`24h\` view switcher
+          - **24-Hour Journal Timeline**: Continuous \`00:00\`–\`23:00\` axis with inline task tiles and empty hour block triggers
           - **Compact Tile Creator & Reminders**: Categories \`[Focus, Work, Personal, Health, Break]\` with fixed color indicators and native notification channels
           - **Dual Storage**: Offline Local Storage Mode (Room SQLite) + Google Cloud Sync (Firebase Auth & Cloud Firestore)
           - Inspired by [Adiseny/daytile](https://github.com/Adiseny/daytile)
