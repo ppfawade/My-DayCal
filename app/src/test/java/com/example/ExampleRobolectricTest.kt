@@ -43,10 +43,7 @@ class ExampleRobolectricTest {
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val taskChannel =
             notificationManager.getNotificationChannel(ReminderNotificationManager.CHANNEL_TASK_REMINDERS)
-        val journalChannel =
-            notificationManager.getNotificationChannel(ReminderNotificationManager.CHANNEL_DAILY_JOURNAL)
         assertNotNull(taskChannel)
-        assertNotNull(journalChannel)
         assertTrue(taskChannel.importance >= NotificationManager.IMPORTANCE_HIGH)
     }
 }

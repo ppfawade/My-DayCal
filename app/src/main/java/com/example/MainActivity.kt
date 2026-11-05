@@ -346,14 +346,6 @@ fun DaytilePlannerShell(
                     ReminderNotificationManager.cancelTaskReminder(context, taskId)
                     viewModel.deleteTask(taskId)
                 },
-                onSaveJournal = { headline, content, mood ->
-                    viewModel.saveJournalForDate(
-                        dateKey = uiState.selectedDateKey,
-                        headline = headline,
-                        content = content,
-                        moodScore = mood
-                    )
-                },
                 onPopulateStarterDay = {
                     viewModel.populateSampleDay(uiState.selectedDateKey)
                 }
@@ -466,7 +458,7 @@ fun DaytilePlannerShell(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isCloudMode) {
                         Text(
-                            text = "Your timeline tiles and reflections sync automatically in real time using free Google Firebase services.",
+                            text = "Your timeline tiles sync automatically in real time using free Google Firebase services.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
@@ -475,7 +467,7 @@ fun DaytilePlannerShell(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Firestore Paths:\n• /users/$currentUserId/tasks\n• /users/$currentUserId/journals",
+                            text = "Firestore Path:\n• /users/$currentUserId/tasks",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -486,7 +478,7 @@ fun DaytilePlannerShell(
                         )
                     } else {
                         Text(
-                            text = "You are using My DayCal offline without an account. All timeline tiles and daily reflections are stored locally on this device in a Room SQLite database (my_daycal_local.db).",
+                            text = "You are using My DayCal offline without an account. All timeline tiles are stored locally on this device in a Room SQLite database (my_daycal_local.db).",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(

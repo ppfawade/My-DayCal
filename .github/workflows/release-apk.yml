@@ -182,14 +182,14 @@ jobs:
           NOTES_FILE="/tmp/release_notes.md"
           cat <<EOF > "$NOTES_FILE"
           ## My DayCal ($TAG)
-          Minimalist daily timeline & reflection journal for Android.
+          Minimalist daily timeline planner for Android.
 
           ### Download APK
           Download and install **\`My-DayCal-${TAG}-release.apk\`** (or \`-debug.apk\`) below on any Android device (Android 7.0+ / API 24+).
 
           ### Highlights
           - **Focused Single-Day Timeline**: Calendar Week (\`CW\`) + \`Mon\`–\`Fri\` strip, top-bar \`MMM dd\` calendar date picker, and \`Focus\` / \`24h\` view switcher
-          - **24-Hour Journal Timeline**: Continuous \`00:00\`–\`23:00\` axis with inline task tiles and empty hour block triggers
+          - **24-Hour Timeline**: Continuous \`00:00\`–\`23:00\` axis with inline task tiles and empty hour block triggers
           - **Compact Tile Creator & Reminders**: Categories \`[Focus, Work, Personal, Health, Break]\` with fixed color indicators and native notification channels
           - **Dual Storage**: Offline Local Storage Mode (Room SQLite) + Google Cloud Sync (Firebase Auth & Cloud Firestore)
           - Inspired by [Adiseny/daytile](https://github.com/Adiseny/daytile)

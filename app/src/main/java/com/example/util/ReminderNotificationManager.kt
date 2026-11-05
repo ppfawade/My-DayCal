@@ -20,7 +20,6 @@ import com.example.data.model.TaskCategory
 
 object ReminderNotificationManager {
     const val CHANNEL_TASK_REMINDERS = "daycal_task_reminders"
-    const val CHANNEL_DAILY_JOURNAL = "daycal_daily_journal"
 
     const val EXTRA_TASK_ID = "extra_task_id"
     const val EXTRA_TASK_TITLE = "extra_task_title"
@@ -41,16 +40,7 @@ object ReminderNotificationManager {
                 enableVibration(true)
             }
 
-            val journalChannel = NotificationChannel(
-                CHANNEL_DAILY_JOURNAL,
-                "Daily Reflection & Check-In",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Gentle reminders for daily planning and reflections"
-            }
-
             notificationManager.createNotificationChannel(taskChannel)
-            notificationManager.createNotificationChannel(journalChannel)
         }
     }
 

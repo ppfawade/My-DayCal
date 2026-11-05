@@ -3,7 +3,6 @@ package com.example.ui.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
 import com.example.data.model.TaskCategory
 import com.example.data.repository.CloudPlannerDataSource
@@ -34,9 +33,7 @@ data class DaytileUiState(
     val selectedDateKey: String = DateUtils.todayDateKey(),
     val todayDateKey: String = DateUtils.todayDateKey(),
     val selectedDayTasks: List<DayTask> = emptyList(),
-    val selectedDayJournal: DayJournal? = null,
     val tasksByDate: Map<String, List<DayTask>> = emptyMap(),
-    val journalsByDate: Map<String, DayJournal> = emptyMap(),
     val isCloudBacked: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
@@ -75,33 +72,13 @@ class DaytileViewModel(
                 initialValue = DataSyncState.Loading
             )
 
-    private val journalsFlow: StateFlow<DataSyncState<List<DayJournal>>> =
-        dataSource.observeJournals()
-            .map<List<DayJournal>, DataSyncState<List<DayJournal>>> { DataSyncState.Success(it) }
-            .catch { error ->
-                val firestoreError = generateSequence(error) { it.cause }
-                    .filterIsInstance<FirebaseFirestoreException>()
-                    .firstOrNull()
-                if (firestoreError == null && error is CancellationException) throw error
-                val rootError = firestoreError ?: error
-                Log.w(TAG, "Error observing journals", rootError)
-                emit(DataSyncState.Error(rootError.message ?: "Failed to load journals"))
-            }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
-                initialValue = DataSyncState.Loading
-            )
-
     val uiState: StateFlow<DaytileUiState> = combine(
         _selectedDateKey,
         tasksFlow,
-        journalsFlow,
         _statusBanner
-    ) { selectedDate, tasksState, journalsState, banner ->
+    ) { selectedDate, tasksState, banner ->
         val today = DateUtils.todayDateKey()
         val allTasks = (tasksState as? DataSyncState.Success)?.data ?: emptyList()
-        val allJournals = (journalsState as? DataSyncState.Success)?.data ?: emptyList()
 
         val tasksByDate = allTasks
             .groupBy { it.dateKey }
@@ -109,20 +86,14 @@ class DaytileViewModel(
                 list.sortedWith(compareBy<DayTask> { it.startMinute }.thenBy { it.title })
             }
 
-        val journalsByDate = allJournals.associateBy { it.dateKey }
-
         val errorMsg = (tasksState as? DataSyncState.Error)?.message
-            ?: (journalsState as? DataSyncState.Error)?.message
-
-        val loading = tasksState is DataSyncState.Loading || journalsState is DataSyncState.Loading
+        val loading = tasksState is DataSyncState.Loading
 
         DaytileUiState(
             selectedDateKey = selectedDate,
             todayDateKey = today,
             selectedDayTasks = tasksByDate[selectedDate] ?: emptyList(),
-            selectedDayJournal = journalsByDate[selectedDate],
             tasksByDate = tasksByDate,
-            journalsByDate = journalsByDate,
             isCloudBacked = dataSource.isCloudBacked,
             isLoading = loading,
             errorMessage = errorMsg,
@@ -243,33 +214,6 @@ class DaytileViewModel(
                 .onFailure { e ->
                     _statusBanner.value = e.localizedMessage ?: "Failed to delete task"
                 }
-        }
-    }
-
-    fun saveJournalForDate(
-        dateKey: String = _selectedDateKey.value,
-        headline: String,
-        content: String,
-        moodScore: Int
-    ) {
-        val existing = uiState.value.journalsByDate[dateKey]
-        viewModelScope.launch {
-            val result = dataSource.saveJournal(
-                dateKey = dateKey,
-                headline = headline,
-                content = content,
-                moodScore = moodScore,
-                existingCreatedAt = existing?.createdAt
-            )
-            result.onSuccess {
-                _statusBanner.value = if (dataSource.isCloudBacked) {
-                    "Daily reflection synced to cloud"
-                } else {
-                    "Daily reflection saved"
-                }
-            }.onFailure { e ->
-                _statusBanner.value = e.localizedMessage ?: "Failed to save reflection"
-            }
         }
     }
 

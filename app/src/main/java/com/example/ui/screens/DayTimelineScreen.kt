@@ -29,9 +29,6 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
@@ -43,14 +40,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -68,7 +62,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
 import com.example.data.model.ReminderOption
 import com.example.data.model.TaskCategory
@@ -93,14 +86,12 @@ fun DayTimelineScreen(
     onToggleTask: (DayTask) -> Unit,
     onAdjustTaskSchedule: (DayTask, Int, Int) -> Unit,
     onDeleteTask: (String) -> Unit,
-    onSaveJournal: (String, String, Int) -> Unit,
     onPopulateStarterDay: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val selectedDate = uiState.selectedDateKey
     val calendarWeek = remember(selectedDate) { DateUtils.getCalendarWeekNumber(selectedDate) }
     val workWeekDays = remember(selectedDate) { DateUtils.getWorkWeekDays(selectedDate) }
-    var isJournalExpanded by rememberSaveable { mutableStateOf(true) }
 
     val tasks = uiState.selectedDayTasks
     val completedCount = tasks.count { it.completed }
@@ -131,7 +122,6 @@ fun DayTimelineScreen(
                 calendarWeek = calendarWeek,
                 workWeekDays = workWeekDays,
                 tasksByDate = uiState.tasksByDate,
-                journalsByDate = uiState.journalsByDate,
                 completedCount = completedCount,
                 totalCount = tasks.size,
                 totalMinutes = totalMinutes,
@@ -199,18 +189,6 @@ fun DayTimelineScreen(
                 )
             }
         }
-
-        // 3. Daily Journal & Reflection Card
-        item(key = "daily_journal_card") {
-            Spacer(modifier = Modifier.height(10.dp))
-            DailyJournalSection(
-                dateKey = selectedDate,
-                existingJournal = uiState.selectedDayJournal,
-                isExpanded = isJournalExpanded,
-                onToggleExpand = { isJournalExpanded = !isJournalExpanded },
-                onSaveJournal = onSaveJournal
-            )
-        }
     }
 }
 
@@ -220,7 +198,6 @@ private fun SingleDayHeaderSection(
     calendarWeek: Int,
     workWeekDays: List<com.example.util.DayChipInfo>,
     tasksByDate: Map<String, List<DayTask>>,
-    journalsByDate: Map<String, DayJournal>,
     completedCount: Int,
     totalCount: Int,
     totalMinutes: Int,
@@ -284,7 +261,6 @@ private fun SingleDayHeaderSection(
                 workWeekDays.forEach { dayInfo ->
                     val isSelected = dayInfo.dateKey == selectedDateKey
                     val hasTasks = (tasksByDate[dayInfo.dateKey]?.isNotEmpty() == true)
-                    val hasJournal = journalsByDate.containsKey(dayInfo.dateKey)
 
                     Surface(
                         shape = RoundedCornerShape(16.dp),
@@ -332,7 +308,6 @@ private fun SingleDayHeaderSection(
                                         when {
                                             isSelected -> Color(0xFF140D00)
                                             hasTasks -> SolarAmber
-                                            hasJournal -> CyberTeal
                                             else -> Color.Transparent
                                         }
                                     )
@@ -1157,259 +1132,6 @@ private fun EmptyDayTileCard(
                     .clip(RoundedCornerShape(8.dp))
                     .clickable { onSwitchTo24h() }
                     .padding(horizontal = 8.dp, vertical = 6.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun DailyJournalSection(
-    dateKey: String,
-    existingJournal: DayJournal?,
-    isExpanded: Boolean,
-    onToggleExpand: () -> Unit,
-    onSaveJournal: (headline: String, content: String, moodScore: Int) -> Unit
-) {
-    var headline by remember(dateKey, existingJournal?.headline) {
-        mutableStateOf(existingJournal?.headline ?: "")
-    }
-    var content by remember(dateKey, existingJournal?.content) {
-        mutableStateOf(existingJournal?.content ?: "")
-    }
-    var moodScore by remember(dateKey, existingJournal?.moodScore) {
-        mutableIntStateOf((existingJournal?.moodScore ?: 4L).toInt())
-    }
-
-    LaunchedEffect(dateKey, existingJournal) {
-        headline = existingJournal?.headline ?: ""
-        content = existingJournal?.content ?: ""
-        moodScore = (existingJournal?.moodScore ?: 4L).toInt()
-    }
-
-    val row1Moods = listOf(
-        1 to "1 • Drained",
-        2 to "2 • Low",
-        3 to "3 • Steady"
-    )
-    val row2Moods = listOf(
-        4 to "4 • Focused",
-        5 to "5 • Peak Flow"
-    )
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = ObsidianSurface,
-        border = BorderStroke(1.dp, ObsidianBorder)
-    ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onToggleExpand() },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = CyberTealContainer,
-                        border = BorderStroke(1.dp, CyberTeal.copy(alpha = 0.45f)),
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                                contentDescription = null,
-                                tint = CyberTeal,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                        Text(
-                            text = stringResource(id = R.string.journal_section_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = if (existingJournal != null) "Reflection saved" else "Capture your intention & reflection",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF94A3B8)
-                        )
-                    }
-                }
-
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = "Toggle journal section",
-                    tint = Color(0xFF94A3B8)
-                )
-            }
-
-            AnimatedVisibility(visible = isExpanded) {
-                Column(modifier = Modifier.padding(top = 16.dp)) {
-                    Text(
-                        text = "ENERGY & FOCUS PULSE",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF7E8B9F),
-                        letterSpacing = 0.8.sp
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Row 1: 1 • Drained, 2 • Low, 3 • Steady
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        row1Moods.forEach { (score, label) ->
-                            MoodPulseChip(
-                                label = label,
-                                isSelected = moodScore == score,
-                                onClick = { moodScore = score },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("mood_chip_$score")
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Row 2: 4 • Focused, 5 • Peak Flow
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        row2Moods.forEach { (score, label) ->
-                            MoodPulseChip(
-                                label = label,
-                                isSelected = moodScore == score,
-                                onClick = { moodScore = score },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("mood_chip_$score")
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    OutlinedTextField(
-                        value = headline,
-                        onValueChange = { headline = it },
-                        placeholder = {
-                            Text(
-                                text = stringResource(id = R.string.journal_headline_hint),
-                                color = Color(0xFF64748B)
-                            )
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF0A0E17),
-                            unfocusedContainerColor = Color(0xFF0A0E17),
-                            focusedBorderColor = CyberTeal,
-                            unfocusedBorderColor = Color(0xFF1F2A3C),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("journal_headline_input")
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = content,
-                        onValueChange = { content = it },
-                        placeholder = {
-                            Text(
-                                text = stringResource(id = R.string.journal_content_hint),
-                                color = Color(0xFF64748B)
-                            )
-                        },
-                        minLines = 3,
-                        maxLines = 8,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = Color(0xFF0A0E17),
-                            unfocusedContainerColor = Color(0xFF0A0E17),
-                            focusedBorderColor = CyberTeal,
-                            unfocusedBorderColor = Color(0xFF1F2A3C),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("journal_content_input")
-                    )
-
-                    if (headline.isNotBlank() || content.isNotBlank() || existingJournal != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = { onSaveJournal(headline, content, moodScore) },
-                            shape = RoundedCornerShape(20.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SolarAmber,
-                                contentColor = Color(0xFF140D00)
-                            ),
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .testTag("save_journal_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(id = R.string.btn_save_journal),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoodPulseChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = if (isSelected) CyberTealContainer else Color(0xFF0B0F19),
-        border = BorderStroke(
-            width = if (isSelected) 1.2.dp else 1.dp,
-            color = if (isSelected) CyberTeal else Color(0xFF1F2A3C)
-        ),
-        modifier = modifier
-            .height(40.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .clickable { onClick() }
-    ) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) CyberTeal else Color(0xFF94A3B8),
-                maxLines = 1
             )
         }
     }

@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">My DayCal</string>
-    <string name="tagline">Minimalist daily timeline &amp; reflection journal.</string>
+    <string name="tagline">Minimalist daily timeline planner.</string>
     <string name="sign_in_google">Sign in with Google</string>
     <string name="continue_local_storage">Continue on Local Storage</string>
     <string name="local_storage_note">No account required • Stored privately on this device</string>
@@ -9,10 +9,6 @@
     <string name="local_badge">Local Storage</string>
     <string name="btn_add_tile">New Time Tile</string>
     <string name="btn_jump_today">Today</string>
-    <string name="journal_section_title">Daily Reflection &amp; Journal</string>
-    <string name="journal_headline_hint">Highlight or intention for this day…</string>
-    <string name="journal_content_hint">Write your daily thoughts, wins, or reflections…</string>
-    <string name="btn_save_journal">Save Reflection</string>
     <string name="empty_day_title">Open Canvas for This Day</string>
     <string name="empty_day_subtitle">Tap any hour slot on the 24-hour timeline or press + to block your time.</string>
 </resources>
