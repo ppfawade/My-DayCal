@@ -1,0 +1,158 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Reusable Hardened Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDateKey(dateKey) {
+      return dateKey is string && dateKey.size() == 10 && dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidCategory(cat) {
+      return cat is string && cat.size() <= 20 &&
+        (cat == 'focus' || cat == 'work' || cat == 'personal' || cat == 'health' || cat == 'routine' || cat == 'creative');
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidDayTask(data) {
+      return data.keys().hasAll([
+               'userId', 'dateKey', 'title', 'notes',
+               'startMinute', 'durationMinutes', 'category',
+               'colorIndex', 'completed', 'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'dateKey', 'title', 'notes',
+               'startMinute', 'durationMinutes', 'category',
+               'colorIndex', 'completed', 'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             isValidDateKey(data.dateKey) &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             data.notes is string && data.notes.size() <= 2000 &&
+             data.startMinute is int && data.startMinute >= 0 && data.startMinute <= 1439 &&
+             data.durationMinutes is int && data.durationMinutes >= 15 && data.durationMinutes <= 720 &&
+             isValidCategory(data.category) &&
+             data.colorIndex is int && data.colorIndex >= 0 && data.colorIndex <= 5 &&
+             data.completed is bool &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidDayJournal(data) {
+      return data.keys().hasAll([
+               'userId', 'dateKey', 'headline', 'content',
+               'moodScore', 'createdAt', 'updatedAt'
+             ]) &&
+             data.keys().hasOnly([
+               'userId', 'dateKey', 'headline', 'content',
+               'moodScore', 'createdAt', 'updatedAt'
+             ]) &&
+             data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.userId == request.auth.uid &&
+             isValidDateKey(data.dateKey) &&
+             data.headline is string && data.headline.size() <= 200 &&
+             data.content is string && data.content.size() <= 10000 &&
+             data.moodScore is int && data.moodScore >= 1 && data.moodScore <= 5 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 4. Per-User Tasks Collection Rules
+    match /users/{userId}/tasks/{taskId} {
+      allow get: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(userId) &&
+                    isValidId(taskId);
+
+      allow list: if isSignedIn() &&
+                     request.auth.uid == userId &&
+                     existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidId(taskId) &&
+                       isValidDayTask(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidDayTask(incoming()) &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidId(taskId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action: Edit task details, schedule, or completion status
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'dateKey', 'title', 'notes', 'startMinute',
+                           'durationMinutes', 'category', 'colorIndex',
+                           'completed', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidId(taskId);
+    }
+
+    // 5. Per-User Journals Collection Rules
+    match /users/{userId}/journals/{dateKey} {
+      allow get: if isSignedIn() &&
+                    request.auth.uid == userId &&
+                    isValidId(userId) &&
+                    isValidDateKey(dateKey);
+
+      allow list: if isSignedIn() &&
+                     request.auth.uid == userId &&
+                     existing().userId == request.auth.uid;
+
+      allow create: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidDateKey(dateKey) &&
+                       incoming().dateKey == dateKey &&
+                       isValidDayJournal(incoming());
+
+      allow update: if isSignedIn() &&
+                       isValidDayJournal(incoming()) &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidDateKey(dateKey) &&
+                       incoming().userId == existing().userId &&
+                       incoming().dateKey == existing().dateKey &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         // Action: Update daily journal reflection or mood
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'headline', 'content', 'moodScore', 'updatedAt'
+                         ])
+                       );
+
+      allow delete: if isSignedIn() &&
+                       request.auth.uid == userId &&
+                       isValidId(userId) &&
+                       isValidDateKey(dateKey);
+    }
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "DayTask": {
+      "title": "DayTask",
+      "description": "A time-blocked daily task or activity tile scheduled on a specific date in the 20-year timeline.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated Google user who owns this task."
+        },
+        "dateKey": {
+          "type": "string",
+          "description": "ISO date key in YYYY-MM-DD format representing the day of the task."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short title of the task or activity block."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional details or reflection notes for the task."
+        },
+        "startMinute": {
+          "type": "integer",
+          "description": "Start time in minutes from midnight (0 to 1439)."
+        },
+        "durationMinutes": {
+          "type": "integer",
+          "description": "Duration of the task block in minutes (15 to 720)."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["focus", "work", "personal", "health", "routine", "creative"],
+          "description": "Activity category for visual tile styling."
+        },
+        "colorIndex": {
+          "type": "integer",
+          "description": "Palette index (0 to 5) for the tile accent color."
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the task tile has been completed."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the task was created (written via FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the task was last updated (written via FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "dateKey",
+        "title",
+        "notes",
+        "startMinute",
+        "durationMinutes",
+        "category",
+        "colorIndex",
+        "completed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DayJournal": {
+      "title": "DayJournal",
+      "description": "Daily journal reflection, intention headline, and mood rating for a specific date.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the authenticated Google user who owns this journal entry."
+        },
+        "dateKey": {
+          "type": "string",
+          "description": "ISO date key in YYYY-MM-DD format matching the document ID."
+        },
+        "headline": {
+          "type": "string",
+          "description": "Daily highlight or focus intention headline."
+        },
+        "content": {
+          "type": "string",
+          "description": "Freeform daily journal and reflection text."
+        },
+        "moodScore": {
+          "type": "integer",
+          "description": "Daily energy/mood rating from 1 to 5."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the journal entry was created (written via FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the journal entry was last updated (written via FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "dateKey",
+        "headline",
+        "content",
+        "moodScore",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": {
+        "$ref": "#/entities/DayTask"
+      },
+      "description": "Per-user collection of daily timeline task tiles across past, present, and future dates."
+    },
+    "/users/{userId}/journals/{dateKey}": {
+      "schema": {
+        "$ref": "#/entities/DayJournal"
+      },
+      "description": "Per-user collection of daily journal entries keyed by YYYY-MM-DD date string."
+    }
+  }
+}
