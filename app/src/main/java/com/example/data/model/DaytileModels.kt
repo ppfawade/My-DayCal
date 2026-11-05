@@ -25,18 +25,6 @@ data class DayTask(
 val DayTask.endMinute: Int
     get() = (startMinute.toInt() + durationMinutes.toInt()).coerceAtMost(1440)
 
-@IgnoreExtraProperties
-data class DayJournal(
-    @DocumentId val id: String = "",
-    val userId: String = "",
-    val dateKey: String = "", // Format: YYYY-MM-DD
-    val headline: String = "",
-    val content: String = "",
-    val moodScore: Long = 3L, // 1..5
-    @ServerTimestamp val createdAt: Timestamp? = null,
-    @ServerTimestamp val updatedAt: Timestamp? = null
-)
-
 enum class TaskCategory(
     val key: String,
     val label: String,

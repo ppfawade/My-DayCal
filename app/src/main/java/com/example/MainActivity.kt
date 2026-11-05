@@ -48,9 +48,11 @@ import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -73,8 +75,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -121,10 +125,7 @@ import com.example.data.repository.LocalPlannerDataSource
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
 import com.example.ui.screens.DayTimelineScreen
-import com.example.ui.theme.CyberTeal
 import com.example.ui.theme.DaytileTheme
-import com.example.ui.theme.FocusBlueText
-import com.example.ui.theme.SlateTextPrimary
 import com.example.ui.theme.getTilePalette
 import com.example.ui.viewmodel.DaytileViewModel
 import com.example.util.DateUtils
@@ -141,19 +142,7 @@ import kotlinx.coroutines.launch
 
 private const val PREFS_NAME = "my_daycal_prefs"
 private const val KEY_LOCAL_MODE = "use_local_storage_mode"
-
-private val TopBarBg = Color(0xFF111319)
-private val SheetBg = Color(0xFF191B22)
-private val CardContainerBg = Color(0xFF1E1F26)
-private val BoxContainerHigh = Color(0xFF282A30)
-private val BoxContainerHighest = Color(0xFF33343B)
-private val AmberPrimary = Color(0xFFFFC174)
-private val AmberContainer = Color(0xFFF59E0B)
-private val OnAmberDark = Color(0xFF2A1700)
-private val OnAmberPrimary = Color(0xFF472A00)
-private val WarmSubtext = Color(0xFFD8C3AD)
-private val WarmLabel = Color(0xFFA08E7A)
-private val WarmDivider = Color(0xFF534434)
+private const val KEY_DARK_THEME = "use_dark_theme_mode"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -161,9 +150,7 @@ class MainActivity : ComponentActivity() {
         ReminderNotificationManager.createNotificationChannels(this)
         enableEdgeToEdge()
         setContent {
-            DaytileTheme {
-                DaytileRootApp()
-            }
+            DaytileRootApp()
         }
     }
 }
@@ -187,6 +174,9 @@ fun DaytileRootApp() {
     var isLocalStorageMode by remember {
         mutableStateOf(prefs.getBoolean(KEY_LOCAL_MODE, false))
     }
+    var isDarkTheme by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(KEY_DARK_THEME, true))
+    }
 
     LaunchedEffect(Unit) {
         kotlinx.coroutines.android.awaitFrame()
@@ -206,41 +196,53 @@ fun DaytileRootApp() {
         }
     }
 
-    val user = currentUser
-    if (!isInitialized) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {}
-    } else if (user != null) {
-        DaytilePlannerShell(
-            sessionKey = "cloud_${user.uid}",
-            isCloudMode = true,
-            currentUserId = user.uid,
-            userLabel = user.email ?: "Signed in with Google",
-            onExitCurrentMode = {}
-        )
-    } else if (isLocalStorageMode) {
-        DaytilePlannerShell(
-            sessionKey = "local_device_mode",
-            isCloudMode = false,
-            currentUserId = "local_user",
-            userLabel = "Local Device Storage (Offline)",
-            onExitCurrentMode = {
-                prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
-                isLocalStorageMode = false
-            }
-        )
-    } else {
-        AuthScreen(
-            onAuthSuccess = {
-                currentUser = runCatching { Firebase.auth.currentUser }.getOrNull()
-            },
-            onContinueWithLocalStorage = {
-                prefs.edit().putBoolean(KEY_LOCAL_MODE, true).apply()
-                isLocalStorageMode = true
-            }
-        )
+    val onToggleTheme = {
+        val nextDark = !isDarkTheme
+        isDarkTheme = nextDark
+        prefs.edit().putBoolean(KEY_DARK_THEME, nextDark).apply()
+    }
+
+    DaytileTheme(darkTheme = isDarkTheme) {
+        val user = currentUser
+        if (!isInitialized) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MaterialTheme.colorScheme.background
+            ) {}
+        } else if (user != null) {
+            DaytilePlannerShell(
+                sessionKey = "cloud_${user.uid}",
+                isCloudMode = true,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
+                currentUserId = user.uid,
+                userLabel = user.email ?: "Signed in with Google",
+                onExitCurrentMode = {}
+            )
+        } else if (isLocalStorageMode) {
+            DaytilePlannerShell(
+                sessionKey = "local_device_mode",
+                isCloudMode = false,
+                isDarkTheme = isDarkTheme,
+                onToggleTheme = onToggleTheme,
+                currentUserId = "local_user",
+                userLabel = "Local Device Storage (Offline)",
+                onExitCurrentMode = {
+                    prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
+                    isLocalStorageMode = false
+                }
+            )
+        } else {
+            AuthScreen(
+                onAuthSuccess = {
+                    currentUser = runCatching { Firebase.auth.currentUser }.getOrNull()
+                },
+                onContinueWithLocalStorage = {
+                    prefs.edit().putBoolean(KEY_LOCAL_MODE, true).apply()
+                    isLocalStorageMode = true
+                }
+            )
+        }
     }
 }
 
@@ -249,6 +251,8 @@ fun DaytileRootApp() {
 fun DaytilePlannerShell(
     sessionKey: String,
     isCloudMode: Boolean,
+    isDarkTheme: Boolean = true,
+    onToggleTheme: () -> Unit = {},
     currentUserId: String,
     userLabel: String,
     onExitCurrentMode: () -> Unit
@@ -277,6 +281,7 @@ fun DaytilePlannerShell(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val colors = MaterialTheme.colorScheme
 
     var showFull24HourGrid by rememberSaveable { mutableStateOf(false) }
     var showDatePickerModal by rememberSaveable { mutableStateOf(false) }
@@ -285,6 +290,25 @@ fun DaytilePlannerShell(
     var presetDateForNewTask by rememberSaveable { mutableStateOf(uiState.selectedDateKey) }
     var presetStartMinute by rememberSaveable { mutableIntStateOf(10 * 60) }
     var showStorageInfoDialog by rememberSaveable { mutableStateOf(false) }
+
+    val handleDeleteWithUndo: (String) -> Unit = { taskId ->
+        val taskTitle = uiState.selectedDayTasks.firstOrNull { it.id == taskId }?.title ?: "Time block"
+        ReminderNotificationManager.cancelTaskReminder(context, taskId)
+        viewModel.deleteTask(taskId)
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            val result = snackbarHostState.showSnackbar(
+                message = "Deleted \"$taskTitle\"",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoLastDelete { restoredTask ->
+                    ReminderNotificationManager.scheduleTaskReminder(context, restoredTask)
+                }
+            }
+        }
+    }
 
     LaunchedEffect(uiState.statusBanner) {
         val msg = uiState.statusBanner
@@ -296,13 +320,15 @@ fun DaytilePlannerShell(
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
-        containerColor = TopBarBg,
+        containerColor = colors.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             DayCalTopBar(
                 isCloudMode = isCloudMode,
+                isDarkTheme = isDarkTheme,
                 showFull24HourGrid = showFull24HourGrid,
                 onToggle24hMode = { showFull24HourGrid = !showFull24HourGrid },
+                onToggleTheme = onToggleTheme,
                 onOpenStorageInfo = { showStorageInfoDialog = true },
                 onCloudAction = {
                     if (isCloudMode) {
@@ -328,8 +354,8 @@ fun DaytilePlannerShell(
                     showTaskEditorSheet = true
                 },
                 shape = CircleShape,
-                containerColor = AmberContainer,
-                contentColor = OnAmberDark,
+                containerColor = colors.primaryContainer,
+                contentColor = colors.onPrimaryContainer,
                 modifier = Modifier
                     .size(56.dp)
                     .testTag("fab_add_task")
@@ -352,6 +378,7 @@ fun DaytilePlannerShell(
                 showFull24HourGrid = showFull24HourGrid,
                 onSwitchTo24h = { showFull24HourGrid = true },
                 onSelectDate = { viewModel.selectDate(it) },
+                onStepWeek = { offsetDays -> viewModel.stepDay(offsetDays) },
                 onOpenDatePicker = { showDatePickerModal = true },
                 onOpenCreateTask = { minute ->
                     editingTask = null
@@ -365,14 +392,24 @@ fun DaytilePlannerShell(
                     presetStartMinute = task.startMinute.toInt()
                     showTaskEditorSheet = true
                 },
-                onToggleTask = { viewModel.toggleTaskCompleted(it) },
+                onToggleTask = { task ->
+                    val toggled = task.copy(completed = !task.completed)
+                    viewModel.toggleTaskCompleted(task)
+                    ReminderNotificationManager.scheduleTaskReminder(context, toggled)
+                },
                 onAdjustTaskSchedule = { task, newStart, newDur ->
-                    viewModel.adjustTaskSchedule(task, newStart, newDur)
+                    val clampedStart = newStart.coerceIn(0, 1425)
+                    val clampedDuration = newDur.coerceIn(15, 720)
+                    viewModel.adjustTaskSchedule(task, clampedStart, clampedDuration)
+                    ReminderNotificationManager.scheduleTaskReminder(
+                        context = context,
+                        task = task.copy(
+                            startMinute = clampedStart.toLong(),
+                            durationMinutes = clampedDuration.toLong()
+                        )
+                    )
                 },
-                onDeleteTask = { taskId ->
-                    ReminderNotificationManager.cancelTaskReminder(context, taskId)
-                    viewModel.deleteTask(taskId)
-                },
+                onDeleteTask = handleDeleteWithUndo,
                 onPopulateStarterDay = {
                     viewModel.populateSampleDay(uiState.selectedDateKey)
                 }
@@ -396,8 +433,8 @@ fun DaytilePlannerShell(
         ModalBottomSheet(
             onDismissRequest = { showTaskEditorSheet = false },
             sheetState = sheetState,
-            containerColor = SheetBg,
-            contentColor = SlateTextPrimary,
+            containerColor = colors.surfaceContainerLow,
+            contentColor = colors.onSurface,
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             dragHandle = {
                 Box(
@@ -411,7 +448,7 @@ fun DaytilePlannerShell(
                             .width(40.dp)
                             .height(4.dp)
                             .clip(CircleShape)
-                            .background(WarmDivider.copy(alpha = 0.6f))
+                            .background(colors.outlineVariant.copy(alpha = 0.6f))
                     )
                 }
             }
@@ -483,9 +520,8 @@ fun DaytilePlannerShell(
                 },
                 onDelete = editingTask?.let { taskToDelete ->
                     {
-                        ReminderNotificationManager.cancelTaskReminder(context, taskToDelete.id)
-                        viewModel.deleteTask(taskToDelete.id)
                         showTaskEditorSheet = false
+                        handleDeleteWithUndo(taskToDelete.id)
                     }
                 }
             )
@@ -558,13 +594,16 @@ fun DaytilePlannerShell(
 @Composable
 private fun DayCalTopBar(
     isCloudMode: Boolean,
+    isDarkTheme: Boolean,
     showFull24HourGrid: Boolean,
     onToggle24hMode: () -> Unit,
+    onToggleTheme: () -> Unit,
     onOpenStorageInfo: () -> Unit,
     onCloudAction: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
-        color = TopBarBg,
+        color = colors.background,
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
@@ -586,10 +625,10 @@ private fun DayCalTopBar(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .background(BoxContainerHigh)
+                        .background(colors.surfaceContainerHigh)
                         .border(
                             width = 1.dp,
-                            color = AmberContainer.copy(alpha = 0.25f),
+                            color = colors.primaryContainer.copy(alpha = 0.25f),
                             shape = RoundedCornerShape(10.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -597,7 +636,7 @@ private fun DayCalTopBar(
                     Icon(
                         imageVector = Icons.Default.Schedule,
                         contentDescription = null,
-                        tint = AmberPrimary,
+                        tint = colors.primary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -607,15 +646,15 @@ private fun DayCalTopBar(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp,
-                    color = SlateTextPrimary,
+                    color = colors.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
 
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = SheetBg,
-                    border = BorderStroke(1.dp, BoxContainerHighest),
+                    color = colors.surfaceContainerLow,
+                    border = BorderStroke(1.dp, colors.surfaceContainerHighest),
                     modifier = Modifier
                         .height(24.dp)
                         .clip(RoundedCornerShape(50))
@@ -630,28 +669,28 @@ private fun DayCalTopBar(
                         Icon(
                             imageVector = if (isCloudMode) Icons.Default.CloudDone else Icons.Default.PhoneAndroid,
                             contentDescription = "Storage Mode Info",
-                            tint = if (isCloudMode) CyberTeal else FocusBlueText,
+                            tint = if (isCloudMode) colors.tertiary else colors.secondary,
                             modifier = Modifier.size(11.dp)
                         )
                         Text(
                             text = if (isCloudMode) "Sync" else "Local",
                             style = MaterialTheme.typography.labelSmall,
                             fontSize = 10.sp,
-                            color = WarmSubtext
+                            color = colors.onSurfaceVariant
                         )
                     }
                 }
             }
 
-            // Right: Segmented [Timeline | 24h] Pill + Crisp 34dp Circular Account Button
+            // Right: Segmented [Timeline | 24h] Pill + Theme Toggle (☀/☾) + Account Button
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = SheetBg,
-                    border = BorderStroke(1.dp, BoxContainerHighest),
+                    color = colors.surfaceContainerLow,
+                    border = BorderStroke(1.dp, colors.surfaceContainerHighest),
                     modifier = Modifier
                         .height(34.dp)
                         .clip(RoundedCornerShape(50))
@@ -666,7 +705,7 @@ private fun DayCalTopBar(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .background(
-                                    if (!showFull24HourGrid) AmberContainer else Color.Transparent
+                                    if (!showFull24HourGrid) colors.primaryContainer else Color.Transparent
                                 )
                                 .padding(horizontal = 10.dp, vertical = 5.dp),
                             contentAlignment = Alignment.Center
@@ -676,14 +715,14 @@ private fun DayCalTopBar(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (!showFull24HourGrid) FontWeight.SemiBold else FontWeight.Medium,
                                 fontSize = 11.sp,
-                                color = if (!showFull24HourGrid) OnAmberDark else WarmSubtext
+                                color = if (!showFull24HourGrid) colors.onPrimaryContainer else colors.onSurfaceVariant
                             )
                         }
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
                                 .background(
-                                    if (showFull24HourGrid) AmberContainer else Color.Transparent
+                                    if (showFull24HourGrid) colors.primaryContainer else Color.Transparent
                                 )
                                 .padding(horizontal = 10.dp, vertical = 5.dp),
                             contentAlignment = Alignment.Center
@@ -693,18 +732,37 @@ private fun DayCalTopBar(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (showFull24HourGrid) FontWeight.SemiBold else FontWeight.Medium,
                                 fontSize = 11.sp,
-                                color = if (showFull24HourGrid) OnAmberDark else WarmSubtext
+                                color = if (showFull24HourGrid) colors.onPrimaryContainer else colors.onSurfaceVariant
                             )
                         }
                     }
+                }
+
+                // Warm Ivory Light / Obsidian Dark Theme Toggle
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(colors.surfaceContainer)
+                        .border(1.dp, colors.surfaceContainerHighest, CircleShape)
+                        .clickable { onToggleTheme() }
+                        .testTag("theme_toggle_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = if (isDarkTheme) "Switch to Warm Ivory Light Theme" else "Switch to Obsidian Dark Theme",
+                        tint = colors.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
 
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(CardContainerBg)
-                        .border(1.dp, BoxContainerHighest, CircleShape)
+                        .background(colors.surfaceContainer)
+                        .border(1.dp, colors.surfaceContainerHighest, CircleShape)
                         .clickable { onCloudAction() }
                         .testTag(if (isCloudMode) "sign_out_button" else "switch_to_cloud_button"),
                     contentAlignment = Alignment.Center
@@ -712,7 +770,7 @@ private fun DayCalTopBar(
                     Icon(
                         imageVector = if (isCloudMode) Icons.AutoMirrored.Filled.Logout else Icons.Default.Person,
                         contentDescription = if (isCloudMode) stringResource(id = R.string.sign_out) else "Switch to Google Cloud Sync",
-                        tint = WarmSubtext,
+                        tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(17.dp)
                     )
                 }
@@ -778,14 +836,6 @@ private enum class ActiveTimeDial {
     MINUTE
 }
 
-/**
- * New Entry / Edit Entry Bottom Sheet:
- * - Header: Title on left, Date Picker centered in the right corner alongside a crisp, non-clipping 34dp `X` close button.
- * - Time Picker: Tap on HOUR to reveal a vertical 12-hour loop dial (`01`..`12`); tap on MINUTE to reveal a vertical loop dial
- *   with 5-minute increments (`00`..`60`). Removed `-1h`, `+1h`, `:00`..`:45` chips.
- * - Duration: Sized consistently (`36.dp` height, `14.dp` horizontal padding, `12.sp` label) to match Category & Reminder pills.
- * - Task & Details: Enlarged prominent area (`18.sp` title input + roomy multi-line notes area).
- */
 @Composable
 private fun TaskTileEditorSheetContent(
     initialTask: DayTask?,
@@ -805,6 +855,7 @@ private fun TaskTileEditorSheetContent(
     onDelete: (() -> Unit)?
 ) {
     val context = LocalContext.current
+    val colors = MaterialTheme.colorScheme
     var title by rememberSaveable { mutableStateOf(initialTask?.title ?: "") }
     var notes by rememberSaveable { mutableStateOf(initialTask?.notes ?: "") }
     var dateKey by rememberSaveable { mutableStateOf(initialTask?.dateKey ?: defaultDateKey) }
@@ -861,7 +912,7 @@ private fun TaskTileEditorSheetContent(
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
-                color = SlateTextPrimary
+                color = colors.onSurface
             )
 
             Row(
@@ -870,8 +921,8 @@ private fun TaskTileEditorSheetContent(
             ) {
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = BoxContainerHigh,
-                    border = BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.40f)),
+                    color = colors.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.40f)),
                     modifier = Modifier
                         .height(34.dp)
                         .clip(RoundedCornerShape(50))
@@ -886,7 +937,7 @@ private fun TaskTileEditorSheetContent(
                         Icon(
                             imageVector = Icons.Default.CalendarMonth,
                             contentDescription = "Pick task date",
-                            tint = AmberPrimary,
+                            tint = colors.primary,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
@@ -894,35 +945,35 @@ private fun TaskTileEditorSheetContent(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp,
-                            color = AmberPrimary
+                            color = colors.primary
                         )
                     }
                 }
 
-                // Crisp 34dp Circular Close Button (using Box instead of IconButton so it never clips)
                 Box(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(BoxContainerHigh)
-                        .border(1.dp, BoxContainerHighest, CircleShape)
+                        .background(colors.surfaceContainerHigh)
+                        .border(1.dp, colors.surfaceContainerHighest, CircleShape)
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = WarmSubtext,
+                        tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(17.dp)
                     )
                 }
             }
         }
 
-        // Step 1: TIME & DURATION Card (`#1E1F26`, `RoundedCornerShape(20.dp)`)
+        // Step 1: TIME & DURATION Card
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = CardContainerBg,
+            color = colors.surfaceContainer,
+            border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.30f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -930,7 +981,6 @@ private fun TaskTileEditorSheetContent(
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // TIME Header with hint
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -943,7 +993,7 @@ private fun TaskTileEditorSheetContent(
                         Icon(
                             imageVector = Icons.Default.Schedule,
                             contentDescription = null,
-                            tint = AmberPrimary,
+                            tint = colors.primary,
                             modifier = Modifier.size(15.dp)
                         )
                         Text(
@@ -951,7 +1001,7 @@ private fun TaskTileEditorSheetContent(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = WarmSubtext
+                            color = colors.onSurfaceVariant
                         )
                     }
                     Text(
@@ -962,19 +1012,17 @@ private fun TaskTileEditorSheetContent(
                         },
                         style = MaterialTheme.typography.labelSmall,
                         fontSize = 10.sp,
-                        color = WarmLabel
+                        color = colors.outline
                     )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Big Time Selector Row: [HOUR Box / Vertical Loop Dial] : [MINUTE Box / Vertical Loop Dial] [AM / PM]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // HOUR Box: Tap to reveal 12-hour vertical loop dial (01..12)
                     TimeDialBox(
                         values = hourOptions,
                         selectedValue = displayHour12,
@@ -1000,10 +1048,9 @@ private fun TaskTileEditorSheetContent(
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.Bold,
                         fontSize = 28.sp,
-                        color = WarmLabel
+                        color = colors.outline
                     )
 
-                    // MINUTE Box: Tap to reveal 5-min increment vertical loop dial (00..60)
                     TimeDialBox(
                         values = minuteOptions,
                         selectedValue = startMinutePart,
@@ -1026,8 +1073,8 @@ private fun TaskTileEditorSheetContent(
                     // Stacked AM / PM Toggle
                     Surface(
                         shape = RoundedCornerShape(14.dp),
-                        color = BoxContainerHigh,
-                        border = BorderStroke(1.dp, WarmDivider.copy(alpha = 0.35f)),
+                        color = colors.surfaceContainerHigh,
+                        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)),
                         modifier = Modifier
                             .width(54.dp)
                             .height(if (activeDial != ActiveTimeDial.NONE) 132.dp else 92.dp)
@@ -1037,7 +1084,7 @@ private fun TaskTileEditorSheetContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f)
-                                    .background(if (!isPm) AmberPrimary else Color.Transparent)
+                                    .background(if (!isPm) colors.primaryContainer else Color.Transparent)
                                     .clickable {
                                         if (isPm) startHour = (startHour - 12).coerceAtLeast(0)
                                     },
@@ -1048,14 +1095,14 @@ private fun TaskTileEditorSheetContent(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
-                                    color = if (!isPm) OnAmberPrimary else WarmLabel
+                                    color = if (!isPm) colors.onPrimaryContainer else colors.outline
                                 )
                             }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .weight(1f)
-                                    .background(if (isPm) AmberPrimary else Color.Transparent)
+                                    .background(if (isPm) colors.primaryContainer else Color.Transparent)
                                     .clickable {
                                         if (!isPm) startHour = (startHour + 12).coerceAtMost(23)
                                     },
@@ -1066,7 +1113,7 @@ private fun TaskTileEditorSheetContent(
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp,
-                                    color = if (isPm) OnAmberPrimary else WarmLabel
+                                    color = if (isPm) colors.onPrimaryContainer else colors.outline
                                 )
                             }
                         }
@@ -1075,7 +1122,6 @@ private fun TaskTileEditorSheetContent(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // DURATION Header + Consistently Sized Pills (`36.dp` height matching Category & Reminder)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1083,7 +1129,7 @@ private fun TaskTileEditorSheetContent(
                     Icon(
                         imageVector = Icons.Default.Timelapse,
                         contentDescription = null,
-                        tint = AmberPrimary,
+                        tint = colors.primary,
                         modifier = Modifier.size(15.dp)
                     )
                     Text(
@@ -1091,7 +1137,7 @@ private fun TaskTileEditorSheetContent(
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
-                        color = WarmSubtext
+                        color = colors.onSurfaceVariant
                     )
                 }
 
@@ -1114,7 +1160,7 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Step 2: Enlarged & Prominent TASK & DETAILS Card (`#1E1F26`, `RoundedCornerShape(20.dp)`)
+        // Step 2: Enlarged & Prominent TASK & DETAILS Card
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1122,7 +1168,7 @@ private fun TaskTileEditorSheetContent(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.Notes,
                 contentDescription = null,
-                tint = AmberPrimary,
+                tint = colors.primary,
                 modifier = Modifier.size(15.dp)
             )
             Text(
@@ -1130,7 +1176,7 @@ private fun TaskTileEditorSheetContent(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
-                color = WarmSubtext
+                color = colors.onSurfaceVariant
             )
         }
 
@@ -1138,12 +1184,11 @@ private fun TaskTileEditorSheetContent(
 
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = CardContainerBg,
-            border = BorderStroke(1.dp, AmberPrimary.copy(alpha = 0.25f)),
+            color = colors.surfaceContainer,
+            border = BorderStroke(1.dp, colors.primaryContainer.copy(alpha = 0.35f)),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Prominent Task Title Input
                 BasicTextField(
                     value = title,
                     onValueChange = { title = it },
@@ -1151,9 +1196,9 @@ private fun TaskTileEditorSheetContent(
                     textStyle = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 18.sp,
-                        color = SlateTextPrimary
+                        color = colors.onSurface
                     ),
-                    cursorBrush = SolidColor(AmberPrimary),
+                    cursorBrush = SolidColor(colors.primary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 18.dp, vertical = 18.dp)
@@ -1166,7 +1211,7 @@ private fun TaskTileEditorSheetContent(
                                     style = MaterialTheme.typography.headlineSmall,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 18.sp,
-                                    color = WarmLabel.copy(alpha = 0.65f)
+                                    color = colors.outline.copy(alpha = 0.70f)
                                 )
                             }
                             innerTextField()
@@ -1174,9 +1219,8 @@ private fun TaskTileEditorSheetContent(
                     }
                 )
 
-                HorizontalDivider(color = WarmDivider.copy(alpha = 0.35f))
+                HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.45f))
 
-                // Enlarged Multi-line Notes / Details Area
                 BasicTextField(
                     value = notes,
                     onValueChange = { notes = it },
@@ -1185,9 +1229,9 @@ private fun TaskTileEditorSheetContent(
                     textStyle = MaterialTheme.typography.bodyLarge.copy(
                         fontSize = 15.sp,
                         lineHeight = 22.sp,
-                        color = WarmSubtext
+                        color = colors.onSurfaceVariant
                     ),
-                    cursorBrush = SolidColor(AmberPrimary),
+                    cursorBrush = SolidColor(colors.primary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 92.dp)
@@ -1200,7 +1244,7 @@ private fun TaskTileEditorSheetContent(
                                     text = "Add key outcomes, context, or quick notes (optional)...",
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontSize = 15.sp,
-                                    color = WarmLabel.copy(alpha = 0.55f)
+                                    color = colors.outline.copy(alpha = 0.60f)
                                 )
                             }
                             innerTextField()
@@ -1212,7 +1256,7 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Step 3: CATEGORY Pills (`[Focus, Work, Personal, Health, Break]`, `36.dp` height)
+        // Step 3: CATEGORY Pills (`[Focus, Work, Personal, Health, Break]`)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1220,7 +1264,7 @@ private fun TaskTileEditorSheetContent(
             Icon(
                 imageVector = Icons.Default.Label,
                 contentDescription = null,
-                tint = AmberPrimary,
+                tint = colors.primary,
                 modifier = Modifier.size(15.dp)
             )
             Text(
@@ -1228,7 +1272,7 @@ private fun TaskTileEditorSheetContent(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
-                color = WarmSubtext
+                color = colors.onSurfaceVariant
             )
         }
 
@@ -1253,11 +1297,11 @@ private fun TaskTileEditorSheetContent(
                     color = if (isSelected) {
                         palette.accent.copy(alpha = 0.18f)
                     } else {
-                        BoxContainerHigh
+                        colors.surfaceContainerHigh
                     },
                     border = BorderStroke(
                         width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected) palette.accent else WarmDivider.copy(alpha = 0.3f)
+                        color = if (isSelected) palette.accent else colors.outlineVariant.copy(alpha = 0.45f)
                     ),
                     modifier = Modifier
                         .height(36.dp)
@@ -1281,7 +1325,7 @@ private fun TaskTileEditorSheetContent(
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                             fontSize = 12.sp,
-                            color = if (isSelected) palette.accent else WarmSubtext
+                            color = if (isSelected) palette.accent else colors.onSurfaceVariant
                         )
                     }
                 }
@@ -1290,7 +1334,7 @@ private fun TaskTileEditorSheetContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Step 4: REMINDER Strip (`36.dp` height for uniform sizing)
+        // Step 4: REMINDER Strip
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1298,7 +1342,7 @@ private fun TaskTileEditorSheetContent(
             Icon(
                 imageVector = Icons.Default.Notifications,
                 contentDescription = null,
-                tint = AmberPrimary,
+                tint = colors.primary,
                 modifier = Modifier.size(15.dp)
             )
             Text(
@@ -1306,7 +1350,7 @@ private fun TaskTileEditorSheetContent(
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,
-                color = WarmSubtext
+                color = colors.onSurfaceVariant
             )
         }
 
@@ -1349,9 +1393,9 @@ private fun TaskTileEditorSheetContent(
                 OutlinedButton(
                     onClick = onDelete,
                     shape = RoundedCornerShape(50),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.dp, colors.error.copy(alpha = 0.55f)),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
+                        contentColor = colors.error
                     ),
                     modifier = Modifier
                         .height(50.dp)
@@ -1389,8 +1433,8 @@ private fun TaskTileEditorSheetContent(
                 },
                 shape = RoundedCornerShape(50),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AmberPrimary,
-                    contentColor = OnAmberPrimary
+                    containerColor = colors.primaryContainer,
+                    contentColor = colors.onPrimaryContainer
                 ),
                 modifier = Modifier
                     .weight(1f)
@@ -1425,12 +1469,6 @@ private fun TaskTileEditorSheetContent(
     }
 }
 
-/**
- * Interactive Time Box that reveals a vertical infinite-looping dial when tapped:
- * - Closed state: Displays the large tabular 2-digit number (`09` or `00`) + subtitle (`HOUR` or `MINUTE`).
- * - Open state: Reveals a 3-row vertical snapping loop dial where scrolling vertically or tapping
- *   adjacent values cycles through the values in an endless loop (`01..12` for HOUR, `00..60` step 5 for MINUTE).
- */
 @Composable
 private fun TimeDialBox(
     values: List<Int>,
@@ -1442,12 +1480,13 @@ private fun TimeDialBox(
     onCloseDial: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(16.dp),
-        color = BoxContainerHigh,
+        color = colors.surfaceContainerHigh,
         border = BorderStroke(
             width = if (isDialOpen) 2.dp else 1.dp,
-            color = if (isDialOpen) AmberPrimary else WarmDivider.copy(alpha = 0.35f)
+            color = if (isDialOpen) colors.primaryContainer else colors.outlineVariant.copy(alpha = 0.45f)
         ),
         modifier = modifier
             .height(if (isDialOpen) 132.dp else 92.dp)
@@ -1465,14 +1504,14 @@ private fun TimeDialBox(
                     style = MaterialTheme.typography.displayLarge,
                     fontWeight = FontWeight.Bold,
                     fontSize = 36.sp,
-                    color = AmberPrimary
+                    color = colors.primary
                 )
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 10.sp,
-                    color = WarmLabel
+                    color = colors.outline
                 )
             }
         } else {
@@ -1495,11 +1534,11 @@ private fun VerticalLoopDial(
     onValueSelected: (Int) -> Unit,
     onCloseDial: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     val count = values.size
     val totalLoops = 200
     val totalItems = count * totalLoops
     val selectedIdxInValues = values.indexOf(selectedValue).coerceAtLeast(0)
-    // Because 3 rows are visible (top, center, bottom), the center item is at firstVisibleItemIndex + 1
     val initialCenterIndex = (totalLoops / 2) * count + selectedIdxInValues
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = (initialCenterIndex - 1).coerceAtLeast(0)
@@ -1524,17 +1563,16 @@ private fun VerticalLoopDial(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Center selection highlight band
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .height(42.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(AmberContainer.copy(alpha = 0.16f))
+                .background(colors.primaryContainer.copy(alpha = 0.16f))
                 .border(
                     width = 1.dp,
-                    color = AmberPrimary.copy(alpha = 0.45f),
+                    color = colors.primaryContainer.copy(alpha = 0.50f),
                     shape = RoundedCornerShape(10.dp)
                 )
         )
@@ -1575,19 +1613,18 @@ private fun VerticalLoopDial(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = if (isCenter) FontWeight.Bold else FontWeight.Medium,
                         fontSize = if (isCenter) 24.sp else 15.sp,
-                        color = if (isCenter) AmberPrimary else WarmLabel.copy(alpha = 0.55f)
+                        color = if (isCenter) colors.primary else colors.outline.copy(alpha = 0.65f)
                     )
                 }
             }
         }
 
-        // Subtle corner label
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             fontSize = 8.sp,
-            color = AmberPrimary.copy(alpha = 0.75f),
+            color = colors.primary.copy(alpha = 0.75f),
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 8.dp, bottom = 4.dp)
@@ -1595,9 +1632,6 @@ private fun VerticalLoopDial(
     }
 }
 
-/**
- * Uniform 36dp Pill Chip used across Duration and Reminder rows to match Category pills.
- */
 @Composable
 private fun SheetPillChip(
     label: String,
@@ -1605,12 +1639,13 @@ private fun SheetPillChip(
     onClick: () -> Unit,
     testTag: String? = null
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(50),
-        color = if (isSelected) AmberPrimary else BoxContainerHigh,
+        color = if (isSelected) colors.primaryContainer else colors.surfaceContainerHigh,
         border = BorderStroke(
             width = 1.dp,
-            color = if (isSelected) AmberPrimary else WarmDivider.copy(alpha = 0.30f)
+            color = if (isSelected) colors.primaryContainer else colors.outlineVariant.copy(alpha = 0.45f)
         ),
         modifier = Modifier
             .height(36.dp)
@@ -1627,7 +1662,7 @@ private fun SheetPillChip(
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                 fontSize = 12.sp,
-                color = if (isSelected) OnAmberPrimary else WarmSubtext,
+                color = if (isSelected) colors.onPrimaryContainer else colors.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center

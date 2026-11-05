@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.DayTask
 import com.example.data.model.TaskCategory
+import com.example.data.model.endMinute
 import com.example.data.repository.CloudPlannerDataSource
 import com.example.data.repository.DaytileRepository
 import com.example.data.repository.PlannerDataSource
@@ -33,6 +34,7 @@ data class DaytileUiState(
     val selectedDateKey: String = DateUtils.todayDateKey(),
     val todayDateKey: String = DateUtils.todayDateKey(),
     val selectedDayTasks: List<DayTask> = emptyList(),
+    val overlappingTaskIds: Set<String> = emptySet(),
     val tasksByDate: Map<String, List<DayTask>> = emptyMap(),
     val isCloudBacked: Boolean = false,
     val isLoading: Boolean = true,
@@ -53,6 +55,7 @@ class DaytileViewModel(
     val selectedDateKey: StateFlow<String> = _selectedDateKey.asStateFlow()
 
     private val _statusBanner = MutableStateFlow<String?>(null)
+    private var lastDeletedTask: DayTask? = null
 
     private val tasksFlow: StateFlow<DataSyncState<List<DayTask>>> =
         dataSource.observeTasks()
@@ -86,13 +89,17 @@ class DaytileViewModel(
                 list.sortedWith(compareBy<DayTask> { it.startMinute }.thenBy { it.title })
             }
 
+        val dayTasks = tasksByDate[selectedDate] ?: emptyList()
+        val overlappingIds = computeOverlappingTaskIds(dayTasks)
+
         val errorMsg = (tasksState as? DataSyncState.Error)?.message
         val loading = tasksState is DataSyncState.Loading
 
         DaytileUiState(
             selectedDateKey = selectedDate,
             todayDateKey = today,
-            selectedDayTasks = tasksByDate[selectedDate] ?: emptyList(),
+            selectedDayTasks = dayTasks,
+            overlappingTaskIds = overlappingIds,
             tasksByDate = tasksByDate,
             isCloudBacked = dataSource.isCloudBacked,
             isLoading = loading,
@@ -209,11 +216,38 @@ class DaytileViewModel(
     }
 
     fun deleteTask(taskId: String) {
+        val existing = uiState.value.selectedDayTasks.firstOrNull { it.id == taskId }
+            ?: uiState.value.tasksByDate.values.flatten().firstOrNull { it.id == taskId }
+        if (existing != null) {
+            lastDeletedTask = existing
+        }
         viewModelScope.launch {
             dataSource.deleteTask(taskId)
                 .onFailure { e ->
                     _statusBanner.value = e.localizedMessage ?: "Failed to delete task"
                 }
+        }
+    }
+
+    fun undoLastDelete(onRestored: ((DayTask) -> Unit)? = null) {
+        val taskToRestore = lastDeletedTask ?: return
+        lastDeletedTask = null
+        viewModelScope.launch {
+            dataSource.createTask(
+                dateKey = taskToRestore.dateKey,
+                title = taskToRestore.title,
+                notes = taskToRestore.notes,
+                startMinute = taskToRestore.startMinute.toInt(),
+                durationMinutes = taskToRestore.durationMinutes.toInt(),
+                category = taskToRestore.category,
+                colorIndex = taskToRestore.colorIndex.toInt(),
+                reminderMinutes = taskToRestore.reminderMinutes.toInt(),
+                completed = taskToRestore.completed
+            ).onSuccess { newId ->
+                onRestored?.invoke(taskToRestore.copy(id = newId))
+            }.onFailure { e ->
+                _statusBanner.value = e.localizedMessage ?: "Could not restore task"
+            }
         }
     }
 
@@ -253,8 +287,28 @@ class DaytileViewModel(
         }
     }
 
-    private companion object {
-        const val TAG = "DaytileViewModel"
-        const val STOP_TIMEOUT_MILLIS = 5000L
+    companion object {
+        private const val TAG = "DaytileViewModel"
+        private const val STOP_TIMEOUT_MILLIS = 5000L
+
+        internal fun computeOverlappingTaskIds(tasks: List<DayTask>): Set<String> {
+            if (tasks.size < 2) return emptySet()
+            val overlapping = mutableSetOf<String>()
+            for (i in tasks.indices) {
+                val a = tasks[i]
+                val aStart = a.startMinute.toInt()
+                val aEnd = a.endMinute
+                for (j in (i + 1) until tasks.size) {
+                    val b = tasks[j]
+                    val bStart = b.startMinute.toInt()
+                    val bEnd = b.endMinute
+                    if (aStart < bEnd && bStart < aEnd) {
+                        if (a.id.isNotBlank()) overlapping.add(a.id)
+                        if (b.id.isNotBlank()) overlapping.add(b.id)
+                    }
+                }
+            }
+            return overlapping
+        }
     }
 }

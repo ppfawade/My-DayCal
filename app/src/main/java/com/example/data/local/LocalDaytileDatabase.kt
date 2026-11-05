@@ -10,7 +10,6 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.Flow
@@ -48,51 +47,21 @@ data class LocalTaskEntity(
     )
 }
 
-@Entity(tableName = "local_journals")
-data class LocalJournalEntity(
-    @PrimaryKey val dateKey: String,
-    val headline: String,
-    val content: String,
-    val moodScore: Long,
-    val createdAtEpochMillis: Long,
-    val updatedAtEpochMillis: Long
-) {
-    fun toDomainModel(): DayJournal = DayJournal(
-        id = dateKey,
-        userId = "local_user",
-        dateKey = dateKey,
-        headline = headline,
-        content = content,
-        moodScore = moodScore,
-        createdAt = Timestamp(Date(createdAtEpochMillis)),
-        updatedAt = Timestamp(Date(updatedAtEpochMillis))
-    )
-}
-
 @Dao
 interface LocalDaytileDao {
     @Query("SELECT * FROM local_tasks ORDER BY dateKey DESC, startMinute ASC")
     fun observeAllTasks(): Flow<List<LocalTaskEntity>>
-
-    @Query("SELECT * FROM local_journals ORDER BY dateKey DESC")
-    fun observeAllJournals(): Flow<List<LocalJournalEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertTask(task: LocalTaskEntity)
 
     @Query("DELETE FROM local_tasks WHERE id = :taskId")
     suspend fun deleteTaskById(taskId: String)
-
-    @Query("SELECT * FROM local_journals WHERE dateKey = :dateKey LIMIT 1")
-    suspend fun getJournalByDate(dateKey: String): LocalJournalEntity?
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertJournal(journal: LocalJournalEntity)
 }
 
 @Database(
-    entities = [LocalTaskEntity::class, LocalJournalEntity::class],
-    version = 2,
+    entities = [LocalTaskEntity::class],
+    version = 3,
     exportSchema = false
 )
 abstract class LocalDaytileDatabase : RoomDatabase() {

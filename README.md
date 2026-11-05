@@ -1,6 +1,6 @@
 # My DayCal
 
-**Minimalist daily timeline & reflection journal.**
+**Minimalist tactile daily timeline planner for Android.**
 
 [![Android Build & APK Release](https://img.shields.io/badge/GitHub_Actions-APK_Release_Pipeline-F59E0B?logo=githubactions&logoColor=white)](.github/workflows/release-apk.yml)
 [![Platform](https://img.shields.io/badge/Platform-Android_(API_24%2B)-14B8A6?logo=android&logoColor=white)](#)
@@ -11,11 +11,44 @@
 
 ## Overview
 
-**My DayCal** is a fast, distraction-free daily timeline planner and personal reflection journal for Android. It focuses your attention on **one single day at a time** with a clean top-bar date picker (`MMM dd`), top-bar `Focus` / `24h` view toggle, compact horizontal-scrolling tile creation, and local notification reminders.
+**My DayCal** is a fast, distraction-free daily timeline planner for Android built with Kotlin and Jetpack Compose. It focuses your attention on **one single day at a time** through a tactile time-blocking interface, a smooth sequential 7-day week ribbon, proportional 24-hour duration cards, and native local notification reminders.
 
-You can use **My DayCal** in two ways right from the minimal start screen:
+### Storage Modes
+
+You can use **My DayCal** in two ways right from the start screen:
 1. **Continue on Local Storage (No Account Required)** — 100% offline, private on-device SQLite storage powered by Android Jetpack Room (`my_daycal_local.db`).
-2. **Sign in with Google (Free Cloud Sync)** — Real-time synchronization across your Android phone and companion web clients using free Google Firebase services (Google Sign-In + Cloud Firestore).
+2. **Sign in with Google (Free Cloud Sync)** — Real-time multi-device synchronization powered by Google Sign-In (`CredentialManager`) and Firebase Cloud Firestore with zero-trust security rules.
+
+---
+
+## Key Features
+
+### 1. Smooth Sequential Week Ribbon & Animated `CW` Badge
+- **All-Day Sequential Strip (`SUN` – `SAT`)**: Glide smoothly across a continuous chronological ribbon of days (`±180` days) with snap-fling physics (`rememberSnapFlingBehavior`).
+- **Sunday Start-of-Week & Dynamic `CW`**: Calendar Week (`CW`) numbers treat **Sunday** as the start of each new week. The `CW` badge dynamically reflects the first visible date while sliding or the selected date when visible, animating with vertical slide + fade transitions. Selecting a Sunday smoothly aligns it as the start of the visible week.
+- **Quick Calendar Jump**: Tap either the `CW` badge or the currently selected day chip to open the full Material 3 Date Picker (`±10` years).
+
+### 2. Dual Timeline Views (`Timeline` & `24h`)
+- **Focused Timeline View**:
+  - Daily summary progress bar (`tasks • scheduled duration • % DONE`).
+  - Chronological task stream with a live `NOW` time indicator and unallocated time gap prompts (`+ Schedule`).
+  - Expandable inline quick-adjust pills (`◀ -30m`, `+30m ▶`, `-15m len`, `+15m len`) that automatically reschedule active reminders.
+- **24-Hour Continuous Grid (`24h`)**:
+  - Full `00:00` – `23:00` hourly axis where scheduled task cards share the same rich design as Timeline mode and **proportionally span across covered hours** according to their duration.
+  - Includes a `Hide empty hours` toggle to collapse unbooked slots on busy days.
+
+### 3. Tactile New / Edit Entry Sheet
+- **Vertical Looping Time Dials**: Tap the **Hour** card to reveal an interactive **12-hour vertical looping dial** (`01`–`12`), or tap the **Minute** card for a **5-minute increment looping dial** (`00`–`55`), paired with an `AM` / `PM` toggle.
+- **Duration & Category Chips**: Horizontal duration chips (`15m`, `30m`, `45m`, `1h`, `1h 30m`, `2h`, `3h`, `4h`) and semantic category pills (`Focus`, `Work`, `Personal`, `Health`, `Break`) with high-contrast color accents.
+- **Prominent Task & Details Editor**: Enlarged input container for task titles and multi-line notes, plus a header date pill to reassign tasks to any date.
+
+### 4. Smart Scheduling Safeguards & Reminders
+- **Overlap Conflict Detection (`OVERLAP`)**: Automatically detects colliding time blocks on the same day and highlights affected cards with an `OVERLAP` warning badge.
+- **Undoable Task Deletion**: Deleting a time block triggers a Snackbar with an **Undo** action that restores both the task and its scheduled notification alarm.
+- **Native Notification Reminders**: `AlarmManager` scheduling (`At start`, `5m`, `10m`, `15m`, `30m`, or `1h before`) delivered via the `daycal_task_reminders` notification channel.
+
+### 5. Dual Theme System ("Obsidian Kinetic" Dark & "Warm Ivory" Light)
+- Switch instantly between **Obsidian Kinetic Dark** (engineered for OLED contrast and low-light focus) and **Warm Ivory Light** (designed for outdoor and daytime readability) via the top-bar Sun/Moon toggle.
 
 ---
 
@@ -29,11 +62,10 @@ This project's core timeline interaction model and minimalist philosophy are ins
   - **Tactile In-Place Tile Adjustments**: Quick duration resizing (`-15m` / `+15m`) and time-slot shifting (`-30m` / `+30m`) directly on the timeline without complex multi-screen forms.
   - **Privacy & Offline-First Ethos**: Providing a zero-account **Local Storage Mode** where all user data stays strictly on the device, honoring Daytile's commitment to local privacy.
 - **How `My DayCal` Extends the Concept**:
-  - **Unified Single-Screen Timeline**: Top-center `MMM dd` calendar picker and top-right `Focus` / `24h` view switcher with zero bottom-tab clutter.
-  - **Compact Horizontal Tile Creator**: Streamlined bottom sheet where Category (`Focus`, `Work`, `Personal`, `Health`, `Break` with fixed color indicators), Start Time, Duration, and Reminder options scroll horizontally.
-  - **Task Reminders & Notification Channels**: Native Android notification channels (`daycal_task_reminders` & `daycal_daily_journal`) with `AlarmManager` scheduling.
-  - **Daily Reflection & Journal**: Per-day reflection journal with a 5-level Energy & Focus Pulse rating, daily highlight headline, and freeform notes.
-  - **Optional Google Cloud Sync**: Opt-in Google Sign-In and hardened Cloud Firestore sync so users who want multi-device access can sync using free Google infrastructure.
+  - **Sequential 7-Day Week Ribbon & Animated `CW` Badge**: Continuous Sunday-start week slider with snap physics and calendar date picker integration.
+  - **Vertical Looping Time Dials & Proportional 24h Spanning**: Interactive 12-hour and 5-minute increment wheel pickers and duration-proportional cards in `24h` view.
+  - **Conflict Detection, Undoable Deletion & Reminders**: Real-time `OVERLAP` badges, Snackbar undo restoration, and `AlarmManager` notifications.
+  - **Dual Themes & Optional Google Cloud Sync**: Obsidian Dark + Warm Ivory Light themes, plus opt-in Google Sign-In and Cloud Firestore sync.
 
 ---
 
@@ -42,7 +74,7 @@ This project's core timeline interaction model and minimalist philosophy are ins
 Pre-built Android APKs (`My-DayCal-release.apk` and `My-DayCal-debug.apk`) are automatically built and published on the [**GitHub Releases**](../../releases) page by the repository's GitHub Actions workflow.
 
 1. Go to the [**Releases**](../../releases) section of this repository.
-2. Download `My-DayCal-release.apk` (or `My-DayCal-debug.apk`) from the latest release.
+2. Download `My-DayCal-<version>-release.apk` (or `-debug.apk`) from the latest release.
 3. Open the downloaded `.apk` file on your Android device (Android 7.0 / API 24 or newer) to install.
 
 ---
@@ -52,16 +84,26 @@ Pre-built Android APKs (`My-DayCal-release.apk` and `My-DayCal-debug.apk`) are a
 This repository includes an automated GitHub Actions pipeline at [`.github/workflows/release-apk.yml`](.github/workflows/release-apk.yml):
 
 - **Triggers**:
-  - Pushing a version tag (`v*.*.*`, e.g., `git tag v1.1.0 && git push origin v1.1.0`).
-  - Pushing commits to `main` or `master` when `app/build.gradle.kts` (`versionName` / `versionCode`) changes, or when the commit message includes `[release]` or `major:`.
+  - Pushing commits to `main` or `master`.
+  - Pushing a version tag (`v*.*.*`, e.g., `git tag v1.2.0 && git push origin v1.2.0`).
   - Manual trigger via **Actions → Build & Release Android APK → Run workflow**.
 - **What It Does**:
-  - Compiles both Debug and Release APKs with Gradle.
-  - Uploads the APKs as workflow build artifacts.
+  - Provisions JDK 21, Gradle, Android SDK 36.1, and signing keystores.
+  - Compiles both Debug and Release APKs (`:app:assembleDebug` and `:app:assembleRelease`).
   - Automatically creates or updates a **GitHub Release** with downloadable `.apk` files attached.
 
 ---
 
 ## Project Structure & Documentation
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for detailed architecture documentation, data models, security rules, and testing instructions.
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for detailed architecture documentation, data models, theme system, security rules, and testing instructions.
+
+---
+
+## Disclaimer — AI-Assisted Development
+
+> **Notice on AI Usage**:  
+> This application—including its Kotlin/Jetpack Compose source code, UI/UX layouts, Room & Firebase data layers, Firestore security rules, unit/Robolectric test suites, GitHub Actions CI/CD workflows, and technical documentation—was developed, refactored, and maintained with the assistance of generative AI software engineering tools.
+>
+> - **Code Review & Verification**: While the codebase is verified using automated Gradle builds, Robolectric JVM tests, and Firestore Emulator security rule tests, AI-generated code may still contain edge-case bugs, UI quirks, or configuration assumptions.
+> - **No Warranty**: This software is provided **"AS IS"**, without warranty of any kind, express or implied. Users and contributors are encouraged to inspect the source code, permissions, and Firebase security rules before deploying to production environments or storing sensitive personal information.

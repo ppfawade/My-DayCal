@@ -1,11 +1,8 @@
 package com.example.data.repository
 
 import com.example.data.local.LocalDaytileDao
-import com.example.data.local.LocalJournalEntity
 import com.example.data.local.LocalTaskEntity
-import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
-import com.google.firebase.Timestamp
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import java.util.UUID
@@ -13,7 +10,6 @@ import java.util.UUID
 interface PlannerDataSource {
     val isCloudBacked: Boolean
     fun observeTasks(): Flow<List<DayTask>>
-    fun observeJournals(): Flow<List<DayJournal>>
     suspend fun createTask(
         dateKey: String,
         title: String,
@@ -28,13 +24,6 @@ interface PlannerDataSource {
 
     suspend fun updateTask(task: DayTask): Result<Unit>
     suspend fun deleteTask(taskId: String): Result<Unit>
-    suspend fun saveJournal(
-        dateKey: String,
-        headline: String,
-        content: String,
-        moodScore: Int,
-        existingCreatedAt: Timestamp? = null
-    ): Result<Unit>
 }
 
 class CloudPlannerDataSource(
@@ -45,9 +34,6 @@ class CloudPlannerDataSource(
 
     override fun observeTasks(): Flow<List<DayTask>> =
         repository.observeTasks(userId)
-
-    override fun observeJournals(): Flow<List<DayJournal>> =
-        repository.observeJournals(userId)
 
     override suspend fun createTask(
         dateKey: String,
@@ -76,20 +62,6 @@ class CloudPlannerDataSource(
 
     override suspend fun deleteTask(taskId: String): Result<Unit> =
         repository.deleteTask(taskId)
-
-    override suspend fun saveJournal(
-        dateKey: String,
-        headline: String,
-        content: String,
-        moodScore: Int,
-        existingCreatedAt: Timestamp?
-    ): Result<Unit> = repository.saveJournal(
-        dateKey = dateKey,
-        headline = headline,
-        content = content,
-        moodScore = moodScore,
-        existingCreatedAt = existingCreatedAt
-    )
 }
 
 class LocalPlannerDataSource(
@@ -99,9 +71,6 @@ class LocalPlannerDataSource(
 
     override fun observeTasks(): Flow<List<DayTask>> =
         dao.observeAllTasks().map { list -> list.map { it.toDomainModel() } }
-
-    override fun observeJournals(): Flow<List<DayJournal>> =
-        dao.observeAllJournals().map { list -> list.map { it.toDomainModel() } }
 
     override suspend fun createTask(
         dateKey: String,
@@ -138,7 +107,7 @@ class LocalPlannerDataSource(
         val now = System.currentTimeMillis()
         val createdMillis = task.createdAt?.toDate()?.time ?: now
         val entity = LocalTaskEntity(
-            id = task.id,
+            id = task.id.ifBlank { UUID.randomUUID().toString() },
             dateKey = task.dateKey,
             title = task.title.trim().take(200),
             notes = task.notes.trim().take(2000),
@@ -156,28 +125,5 @@ class LocalPlannerDataSource(
 
     override suspend fun deleteTask(taskId: String): Result<Unit> = runCatching {
         dao.deleteTaskById(taskId)
-    }
-
-    override suspend fun saveJournal(
-        dateKey: String,
-        headline: String,
-        content: String,
-        moodScore: Int,
-        existingCreatedAt: Timestamp?
-    ): Result<Unit> = runCatching {
-        val now = System.currentTimeMillis()
-        val existing = dao.getJournalByDate(dateKey)
-        val createdMillis = existing?.createdAtEpochMillis
-            ?: existingCreatedAt?.toDate()?.time
-            ?: now
-        val entity = LocalJournalEntity(
-            dateKey = dateKey,
-            headline = headline.trim().take(200),
-            content = content.trim().take(10000),
-            moodScore = moodScore.coerceIn(1, 5).toLong(),
-            createdAtEpochMillis = createdMillis,
-            updatedAtEpochMillis = now
-        )
-        dao.upsertJournal(entity)
     }
 }

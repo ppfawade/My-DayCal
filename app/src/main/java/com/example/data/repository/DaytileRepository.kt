@@ -2,10 +2,8 @@ package com.example.data.repository
 
 import android.content.Context
 import com.example.R
-import com.example.data.model.DayJournal
 import com.example.data.model.DayTask
 import com.google.firebase.Firebase
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.DocumentSnapshot
@@ -48,30 +46,6 @@ class DaytileRepository(
                 .map { snapshot ->
                     snapshot.toObjects(
                         DayTask::class.java,
-                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
-                    )
-                }
-                .catch { error ->
-                    val firestoreError = generateSequence(error) { it.cause }
-                        .filterIsInstance<FirebaseFirestoreException>()
-                        .firstOrNull()
-                    if (firestoreError == null && error is CancellationException) throw error
-                    val exceptionToLog = firestoreError ?: (error as? Exception) ?: Exception(error)
-                    handleFirestoreError(exceptionToLog, OperationType.LIST, path)
-                    throw error
-                }
-        )
-    }
-
-    fun observeJournals(userId: String = auth.currentUser?.uid ?: "unauthenticated"): Flow<List<DayJournal>> = flow {
-        val path = "users/$userId/journals"
-        emitAll(
-            db.collection("users").document(userId).collection("journals")
-                .whereEqualTo("userId", userId)
-                .snapshots()
-                .map { snapshot ->
-                    snapshot.toObjects(
-                        DayJournal::class.java,
                         DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
                     )
                 }
@@ -192,40 +166,6 @@ class DaytileRepository(
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.GET, docRef.path)
-            throw e
-        }
-    }
-
-    suspend fun saveJournal(
-        dateKey: String,
-        headline: String,
-        content: String,
-        moodScore: Int,
-        existingCreatedAt: Timestamp? = null
-    ): Result<Unit> = runCatching {
-        val uid = requireUserId()
-        val docRef = db.collection("users").document(uid).collection("journals").document(dateKey)
-        try {
-            val resolvedCreatedAt = existingCreatedAt ?: run {
-                val snap = docRef.get().await()
-                if (snap.exists()) snap.getTimestamp("createdAt") else null
-            }
-            val journal = DayJournal(
-                id = dateKey,
-                userId = uid,
-                dateKey = dateKey,
-                headline = headline.trim().take(200),
-                content = content.trim().take(10000),
-                moodScore = moodScore.coerceIn(1, 5).toLong(),
-                createdAt = resolvedCreatedAt,
-                updatedAt = null
-            )
-            docRef.set(journal).await()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            val op = if (existingCreatedAt == null) OperationType.CREATE else OperationType.UPDATE
-            handleFirestoreError(e, op, docRef.path)
             throw e
         }
     }

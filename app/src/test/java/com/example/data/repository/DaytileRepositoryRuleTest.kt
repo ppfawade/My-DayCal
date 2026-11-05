@@ -49,25 +49,32 @@ class DaytileRepositoryRuleTest : FirestoreEmulatorTestBase() {
     }
 
     @Test
-    fun saveAndObserveJournal_authenticatedOwner_succeeds() = runBlocking {
+    fun updateAndDeleteTask_authenticatedOwner_succeeds() = runBlocking {
         val aliceUid = signInTestUser(ALICE_EMAIL)
         val repository = DaytileRepository(firestore, auth)
-        val randomDay = String.format("2026-10-%02d", (1..28).random())
 
-        val saveResult = withTimeout(DEFAULT_TIMEOUT_MS) {
-            repository.saveJournal(
-                dateKey = randomDay,
-                headline = "Calm and focused day",
-                content = "Completed all key timeline blocks ahead of schedule.",
-                moodScore = 5
-            )
+        val taskId = withTimeout(DEFAULT_TIMEOUT_MS) {
+            repository.createTask(
+                dateKey = "2026-11-06",
+                title = "Initial Focus Session",
+                startMinute = 600,
+                durationMinutes = 60
+            ).getOrThrow()
         }
-        assertTrue("Expected journal save to succeed: ${saveResult.exceptionOrNull()}", saveResult.isSuccess)
 
-        val journals = withTimeout(FLOW_TIMEOUT_MS) {
-            repository.observeJournals(aliceUid).first { list -> list.any { it.dateKey == randomDay } }
+        val createdTask = withTimeout(FLOW_TIMEOUT_MS) {
+            repository.observeTasks(aliceUid).first { list -> list.any { it.id == taskId } }
+        }.first { it.id == taskId }
+
+        val updateResult = withTimeout(DEFAULT_TIMEOUT_MS) {
+            repository.updateTask(createdTask.copy(title = "Updated Focus Session", completed = true))
         }
-        assertTrue(journals.any { it.dateKey == randomDay && it.moodScore == 5L })
+        assertTrue("Expected task update to succeed: ${updateResult.exceptionOrNull()}", updateResult.isSuccess)
+
+        val deleteResult = withTimeout(DEFAULT_TIMEOUT_MS) {
+            repository.deleteTask(taskId)
+        }
+        assertTrue("Expected task delete to succeed: ${deleteResult.exceptionOrNull()}", deleteResult.isSuccess)
     }
 
     @Test

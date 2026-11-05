@@ -51,7 +51,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -192,15 +191,6 @@ fun signOutUser(
     }
 }
 
-/**
- * Minimal Launch & Storage Screen matching the attached HTML specification:
- * - Surface background (#111319)
- * - 96dp x 96dp emblem box (#0c0e14) with ambient amber glow and 3-Bar Cadence SVG glyph (36w, 24w, 16w in #f59e0b)
- * - Brand title + "Lightning-fast daily time blocking."
- * - Primary CTA: Rounded pill in #f59e0b with monochromatic Google 'G' icon + "Sign in with Google"
- * - Secondary CTA: Rounded pill in #282a30 with bolt icon + "Continue Offline" on left and "Local" pill badge on right
- * - Privacy footnote: lock icon (#56e5a9) + "100% private • No account required • Stored on device"
- */
 @Composable
 fun AuthScreen(
     onAuthSuccess: () -> Unit,
@@ -210,6 +200,7 @@ fun AuthScreen(
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val colors = MaterialTheme.colorScheme
 
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -226,7 +217,7 @@ fun AuthScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFF111319)
+        color = colors.background
     ) {
         Column(
             modifier = Modifier
@@ -243,42 +234,38 @@ fun AuthScreen(
                 modifier = Modifier
                     .size(96.dp)
                     .clip(RoundedCornerShape(28.dp))
-                    .background(Color(0xFF0C0E14))
-                    .border(1.dp, Color(0x26F59E0B), RoundedCornerShape(28.dp)),
+                    .background(colors.surfaceContainerLowest)
+                    .border(1.dp, colors.primaryContainer.copy(alpha = 0.25f), RoundedCornerShape(28.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                // Inner soft amber glow aura
                 Box(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(RoundedCornerShape(22.dp))
-                        .background(Color(0x1FF59E0B))
+                        .background(colors.primaryContainer.copy(alpha = 0.14f))
                 )
 
-                // Tactile 3-Line Minimalist Cadence Glyph (36px, 24px, 16px stepped bars in #f59e0b)
+                val barColor = colors.primaryContainer
                 Canvas(modifier = Modifier.size(48.dp)) {
                     val scale = size.width / 48f
                     val barHeight = 4.5f * scale
                     val radius = CornerRadius(2.25f * scale, 2.25f * scale)
                     val startX = 6f * scale
 
-                    // Bar 1: width 36, opacity 1.0
                     drawRoundRect(
-                        color = Color(0xFFF59E0B),
+                        color = barColor,
                         topLeft = Offset(startX, 11f * scale),
                         size = Size(36f * scale, barHeight),
                         cornerRadius = radius
                     )
-                    // Bar 2: width 24, opacity 0.85
                     drawRoundRect(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.85f),
+                        color = barColor.copy(alpha = 0.85f),
                         topLeft = Offset(startX, 22f * scale),
                         size = Size(24f * scale, barHeight),
                         cornerRadius = radius
                     )
-                    // Bar 3: width 16, opacity 0.60
                     drawRoundRect(
-                        color = Color(0xFFF59E0B).copy(alpha = 0.60f),
+                        color = barColor.copy(alpha = 0.60f),
                         topLeft = Offset(startX, 33f * scale),
                         size = Size(16f * scale, barHeight),
                         cornerRadius = radius
@@ -292,7 +279,7 @@ fun AuthScreen(
                 text = stringResource(id = R.string.app_name),
                 style = MaterialTheme.typography.displayMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFFE2E2EB),
+                color = colors.onSurface,
                 textAlign = TextAlign.Center
             )
 
@@ -301,7 +288,7 @@ fun AuthScreen(
             Text(
                 text = stringResource(id = R.string.tagline),
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color(0xFFD8C3AD),
+                color = colors.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
@@ -310,7 +297,7 @@ fun AuthScreen(
             if (errorMessage != null) {
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF93000A)
+                        containerColor = colors.errorContainer
                     ),
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier
@@ -320,14 +307,13 @@ fun AuthScreen(
                     Text(
                         text = errorMessage ?: "",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFFFFDAD6),
+                        color = colors.onErrorContainer,
                         modifier = Modifier.padding(14.dp)
                     )
                 }
             }
 
-            // Interactive Action Module
-            // 1. Primary CTA: Google Sign In (#f59e0b bg, #472a00 / #2a1700 text)
+            // 1. Primary CTA: Google Sign In
             Button(
                 onClick = {
                     errorMessage = null
@@ -353,8 +339,8 @@ fun AuthScreen(
                 enabled = !isLoading,
                 shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFF59E0B),
-                    contentColor = Color(0xFF2A1700)
+                    containerColor = colors.primaryContainer,
+                    contentColor = colors.onPrimaryContainer
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -364,12 +350,12 @@ fun AuthScreen(
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = Color(0xFF2A1700),
+                        color = colors.onPrimaryContainer,
                         strokeWidth = 2.5.dp
                     )
                 } else {
                     GoogleMonochromeGIcon(
-                        tint = Color(0xFF2A1700),
+                        tint = colors.onPrimaryContainer,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -377,17 +363,17 @@ fun AuthScreen(
                         text = stringResource(id = R.string.sign_in_google),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF2A1700)
+                        color = colors.onPrimaryContainer
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. Secondary CTA: Continue Offline + "Local" badge on right (#282a30 surface-container-high)
+            // 2. Secondary CTA: Continue Offline + "Local" badge on right
             Surface(
                 shape = CircleShape,
-                color = Color(0xFF282A30),
+                color = colors.surfaceContainerHigh,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
@@ -409,26 +395,26 @@ fun AuthScreen(
                         Icon(
                             imageVector = Icons.Default.Bolt,
                             contentDescription = null,
-                            tint = Color(0xFFFFC174),
+                            tint = colors.primary,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
                             text = stringResource(id = R.string.continue_local_storage),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFFE2E2EB)
+                            color = colors.onSurface
                         )
                     }
 
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFF0C0E14)
+                        color = colors.surfaceContainerLowest
                     ) {
                         Text(
                             text = "Local",
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFFD8C3AD),
+                            color = colors.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                         )
                     }
@@ -445,14 +431,14 @@ fun AuthScreen(
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = null,
-                    tint = Color(0xFF56E5A9),
+                    tint = colors.tertiary,
                     modifier = Modifier.size(13.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = stringResource(id = R.string.local_storage_note),
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFFD8C3AD),
+                    color = colors.onSurfaceVariant,
                     fontSize = 12.sp,
                     textAlign = TextAlign.Center
                 )

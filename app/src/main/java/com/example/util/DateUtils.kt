@@ -83,30 +83,71 @@ object DateUtils {
     }
 
     /**
-     * Returns the ISO-8601 Calendar Week (CW) number (1..53) for the given dateKey.
+     * Returns true if [dateKey] falls on a Sunday (the start of a new week).
+     */
+    fun isSunday(dateKey: String): Boolean {
+        val cal = parseDateKey(dateKey)
+        return cal.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+    }
+
+    /**
+     * Returns the Sunday dateKey (YYYY-MM-DD) that starts the week containing [dateKey].
+     */
+    fun getStartOfSundayWeek(dateKey: String): String {
+        val cal = parseDateKey(dateKey)
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        val offsetToSunday = Calendar.SUNDAY - dow
+        cal.add(Calendar.DAY_OF_MONTH, offsetToSunday)
+        return formatCalendar(cal)
+    }
+
+    /**
+     * Returns the Calendar Week (CW) number (1..53) with Sunday as the start of each new week.
      */
     fun getCalendarWeekNumber(dateKey: String): Int {
         val cal = parseDateKey(dateKey)
-        cal.firstDayOfWeek = Calendar.MONDAY
-        cal.minimalDaysInFirstWeek = 4
+        cal.firstDayOfWeek = Calendar.SUNDAY
+        cal.minimalDaysInFirstWeek = 1
         return cal.get(Calendar.WEEK_OF_YEAR)
     }
 
     /**
-     * Returns Monday through Saturday (and Sunday if selected) of the ISO week containing [dateKey].
+     * Returns a continuous sequential list of days around [anchorDateKey] (including all Sundays)
+     * for smooth horizontal day/week sliding.
+     */
+    fun getSequentialDays(anchorDateKey: String, radiusDays: Int = 180): List<DayChipInfo> {
+        val today = todayDateKey()
+        val cal = parseDateKey(anchorDateKey)
+        cal.add(Calendar.DAY_OF_MONTH, -radiusDays)
+        val totalDays = radiusDays * 2 + 1
+        val list = ArrayList<DayChipInfo>(totalDays)
+        for (i in 0 until totalDays) {
+            val key = formatCalendar(cal)
+            val dow = cal.get(Calendar.DAY_OF_WEEK) - 1
+            list.add(
+                DayChipInfo(
+                    dateKey = key,
+                    dayOfMonth = cal.get(Calendar.DAY_OF_MONTH),
+                    dayOfWeekShort = dayOfWeekShort[dow.coerceIn(0, 6)],
+                    monthShort = monthNamesShort[cal.get(Calendar.MONTH).coerceIn(0, 11)],
+                    year = cal.get(Calendar.YEAR),
+                    isToday = key == today
+                )
+            )
+            cal.add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return list
+    }
+
+    /**
+     * Returns Sunday through Saturday (all 7 days) of the week containing [dateKey].
      */
     fun getWorkWeekDays(dateKey: String): List<DayChipInfo> {
         val today = todayDateKey()
-        val cal = parseDateKey(dateKey)
-        val dow = cal.get(Calendar.DAY_OF_WEEK)
-        // Compute offset back to Monday of this ISO week (Sunday belongs to end of Mon..Sun week)
-        val offsetToMonday = if (dow == Calendar.SUNDAY) -6 else (Calendar.MONDAY - dow)
-        cal.add(Calendar.DAY_OF_MONTH, offsetToMonday)
-        val mondayKey = formatCalendar(cal)
-        val lastOffset = if (dow == Calendar.SUNDAY) 6 else 5
+        val sundayKey = getStartOfSundayWeek(dateKey)
 
-        return (0..lastOffset).map { dayOffset ->
-            val key = addDays(mondayKey, dayOffset)
+        return (0..6).map { dayOffset ->
+            val key = addDays(sundayKey, dayOffset)
             val dCal = parseDateKey(key)
             val dDow = dCal.get(Calendar.DAY_OF_WEEK) - 1
             DayChipInfo(
@@ -138,7 +179,7 @@ object DateUtils {
     }
 
     /**
-     * Formats date as "MMM XX" (e.g., "Nov 05") for the top center header.
+     * Formats date as "MMM XX" (e.g., "Nov 05").
      */
     fun formatShortMonthDay(dateKey: String): String {
         val cal = parseDateKey(dateKey)
