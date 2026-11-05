@@ -82,6 +82,43 @@ object DateUtils {
         return formatCalendar(cal)
     }
 
+    /**
+     * Returns the ISO-8601 Calendar Week (CW) number (1..53) for the given dateKey.
+     */
+    fun getCalendarWeekNumber(dateKey: String): Int {
+        val cal = parseDateKey(dateKey)
+        cal.firstDayOfWeek = Calendar.MONDAY
+        cal.minimalDaysInFirstWeek = 4
+        return cal.get(Calendar.WEEK_OF_YEAR)
+    }
+
+    /**
+     * Returns Monday through Friday (Mon..Fri) of the ISO week containing [dateKey].
+     */
+    fun getWorkWeekDays(dateKey: String): List<DayChipInfo> {
+        val today = todayDateKey()
+        val cal = parseDateKey(dateKey)
+        val dow = cal.get(Calendar.DAY_OF_WEEK)
+        // Compute offset back to Monday of this ISO week (Sunday belongs to end of Mon..Sun week)
+        val offsetToMonday = if (dow == Calendar.SUNDAY) -6 else (Calendar.MONDAY - dow)
+        cal.add(Calendar.DAY_OF_MONTH, offsetToMonday)
+        val mondayKey = formatCalendar(cal)
+
+        return (0..4).map { dayOffset ->
+            val key = addDays(mondayKey, dayOffset)
+            val dCal = parseDateKey(key)
+            val dDow = dCal.get(Calendar.DAY_OF_WEEK) - 1
+            DayChipInfo(
+                dateKey = key,
+                dayOfMonth = dCal.get(Calendar.DAY_OF_MONTH),
+                dayOfWeekShort = dayOfWeekShort[dDow.coerceIn(0, 6)],
+                monthShort = monthNamesShort[dCal.get(Calendar.MONTH).coerceIn(0, 11)],
+                year = dCal.get(Calendar.YEAR),
+                isToday = key == today
+            )
+        }
+    }
+
     fun getSurroundingDays(centerDateKey: String, radius: Int = 3): List<DayChipInfo> {
         val today = todayDateKey()
         return (-radius..radius).map { offset ->

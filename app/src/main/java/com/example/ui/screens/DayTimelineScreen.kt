@@ -93,7 +93,8 @@ fun DayTimelineScreen(
     modifier: Modifier = Modifier
 ) {
     val selectedDate = uiState.selectedDateKey
-    val surroundingDays = remember(selectedDate) { DateUtils.getSurroundingDays(selectedDate, radius = 3) }
+    val calendarWeek = remember(selectedDate) { DateUtils.getCalendarWeekNumber(selectedDate) }
+    val workWeekDays = remember(selectedDate) { DateUtils.getWorkWeekDays(selectedDate) }
     var isJournalExpanded by rememberSaveable { mutableStateOf(true) }
 
     val tasks = uiState.selectedDayTasks
@@ -107,11 +108,12 @@ fun DayTimelineScreen(
             .testTag("day_timeline_list"),
         contentPadding = PaddingValues(bottom = 104.dp)
     ) {
-        // 1. Compact 7-Day Ribbon & Completion Bar (date title is in top bar center as MMM XX)
+        // 1. CW (Calendar Week) + Mon to Fri Workweek Bar & Completion Progress
         item(key = "day_header") {
             SingleDayHeaderSection(
                 selectedDateKey = selectedDate,
-                surroundingDays = surroundingDays,
+                calendarWeek = calendarWeek,
+                workWeekDays = workWeekDays,
                 tasksByDate = uiState.tasksByDate,
                 journalsByDate = uiState.journalsByDate,
                 completedCount = completedCount,
@@ -197,7 +199,8 @@ fun DayTimelineScreen(
 @Composable
 private fun SingleDayHeaderSection(
     selectedDateKey: String,
-    surroundingDays: List<com.example.util.DayChipInfo>,
+    calendarWeek: Int,
+    workWeekDays: List<com.example.util.DayChipInfo>,
     tasksByDate: Map<String, List<DayTask>>,
     journalsByDate: Map<String, DayJournal>,
     completedCount: Int,
@@ -216,13 +219,43 @@ private fun SingleDayHeaderSection(
                 .fillMaxWidth()
                 .padding(top = 10.dp, bottom = 14.dp)
         ) {
-            // 7-day interactive ribbon centered around the selected date
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Fixed single-row bar: CW (Calendar Week) badge on left + Mon to Fri chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(surroundingDays, key = { it.dateKey }) { dayInfo ->
+                // CW (Calendar Week) indicator
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f),
+                    modifier = Modifier.testTag("calendar_week_badge")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "CW",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = String.format(java.util.Locale.US, "%02d", calendarWeek),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(9.dp))
+                    }
+                }
+
+                // Mon to Fri (5 workdays)
+                workWeekDays.forEach { dayInfo ->
                     val isSelected = dayInfo.dateKey == selectedDateKey
                     val hasTasks = (tasksByDate[dayInfo.dateKey]?.isNotEmpty() == true)
                     val hasJournal = journalsByDate.containsKey(dayInfo.dateKey)
@@ -235,7 +268,7 @@ private fun SingleDayHeaderSection(
                             else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                         },
                         modifier = Modifier
-                            .width(50.dp)
+                            .weight(1f)
                             .clip(MaterialTheme.shapes.medium)
                             .clickable { onSelectDate(dayInfo.dateKey) }
                             .testTag("day_ribbon_${dayInfo.dateKey}")
