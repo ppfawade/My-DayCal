@@ -10,8 +10,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,17 +40,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudQueue
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.NotificationsNone
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.ViewStream
-import androidx.compose.material.icons.filled.ViewTimeline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,6 +57,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -82,8 +82,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.credentials.CredentialManager
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
@@ -101,7 +103,15 @@ import com.example.data.repository.LocalPlannerDataSource
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
 import com.example.ui.screens.DayTimelineScreen
+import com.example.ui.theme.CyberTeal
+import com.example.ui.theme.CyberTealContainer
 import com.example.ui.theme.DaytileTheme
+import com.example.ui.theme.FocusBluePillBg
+import com.example.ui.theme.FocusBluePillBorder
+import com.example.ui.theme.FocusBlueText
+import com.example.ui.theme.SolarAmber
+import com.example.ui.theme.SolarAmberBorder
+import com.example.ui.theme.SolarAmberContainer
 import com.example.ui.theme.getTilePalette
 import com.example.ui.viewmodel.DaytileViewModel
 import com.example.util.DateUtils
@@ -255,6 +265,7 @@ fun DaytilePlannerShell(
 
     Scaffold(
         contentWindowInsets = WindowInsets.safeDrawing,
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             DayCalTopBar(
@@ -286,13 +297,17 @@ fun DaytilePlannerShell(
                     presetStartMinute = 9 * 60
                     showTaskEditorSheet = true
                 },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.testTag("fab_add_task")
+                shape = RoundedCornerShape(20.dp),
+                containerColor = SolarAmber,
+                contentColor = Color(0xFF140D00),
+                modifier = Modifier
+                    .size(58.dp)
+                    .testTag("fab_add_task")
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(id = R.string.btn_add_tile)
+                    contentDescription = stringResource(id = R.string.btn_add_tile),
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
@@ -355,7 +370,10 @@ fun DaytilePlannerShell(
 
     if (showTaskEditorSheet) {
         ModalBottomSheet(
-            onDismissRequest = { showTaskEditorSheet = false }
+            onDismissRequest = { showTaskEditorSheet = false },
+            containerColor = Color(0xFF0D121C),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             TaskTileEditorSheetContent(
                 initialTask = editingTask,
@@ -496,6 +514,12 @@ fun DaytilePlannerShell(
     }
 }
 
+/**
+ * Top Bar matching Screenshots 3 & 4:
+ * - Left: My DayCal + [📱 Local] bordered pill
+ * - Center: [📅 Nov 05] amber bordered pill
+ * - Right: [= Focus] / [⊞ 24h] blue bordered pill + Cloud icon
+ */
 @Composable
 private fun DayCalTopBar(
     selectedDateKey: String,
@@ -516,60 +540,52 @@ private fun DayCalTopBar(
             .fillMaxWidth()
             .statusBarsPadding()
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(60.dp)
-                .padding(horizontal = 12.dp)
+                .height(62.dp)
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // Left: App Title + Storage Mode Badge
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.align(Alignment.CenterStart)
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = stringResource(id = R.string.app_name),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1
+                    fontSize = 18.sp,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isCloudMode) {
-                        MaterialTheme.colorScheme.secondaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF0E1420),
+                    border = BorderStroke(1.dp, Color(0xFF1F2A3C)),
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable { onOpenStorageInfo() }
                         .testTag("storage_mode_badge")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             imageVector = if (isCloudMode) Icons.Default.CloudDone else Icons.Default.PhoneAndroid,
                             contentDescription = "Storage Mode Info",
-                            tint = if (isCloudMode) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.size(13.dp)
+                            tint = if (isCloudMode) CyberTeal else FocusBlueText,
+                            modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(3.dp))
                         Text(
                             text = if (isCloudMode) "Sync" else "Local",
                             style = MaterialTheme.typography.labelMedium,
-                            color = if (isCloudMode) {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            color = Color(0xFF94A3B8)
                         )
                     }
                 }
@@ -577,76 +593,68 @@ private fun DayCalTopBar(
 
             // Center: MMM XX Date Picker Trigger
             Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(14.dp),
+                color = SolarAmberContainer,
+                border = BorderStroke(1.dp, SolarAmberBorder),
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(14.dp))
                     .clickable { onOpenDatePicker() }
                     .testTag("top_date_picker_button")
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CalendarMonth,
                         contentDescription = "Open calendar date picker",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
+                        tint = SolarAmber,
+                        modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = shortDateText,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = SolarAmber,
+                        maxLines = 1
                     )
                 }
             }
 
-            // Right: 24h / Focus Toggle + Cloud Action Button
+            // Right: Focus / 24h Toggle + Cloud Action Button
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.align(Alignment.CenterEnd)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = if (showFull24HourGrid) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
+                    shape = RoundedCornerShape(12.dp),
+                    color = if (showFull24HourGrid) SolarAmber else FocusBluePillBg,
+                    border = BorderStroke(
+                        1.dp,
+                        if (showFull24HourGrid) SolarAmber else FocusBluePillBorder
+                    ),
                     modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable { onToggle24hMode() }
                         .testTag("toggle_24h_grid_button")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Icon(
-                            imageVector = if (showFull24HourGrid) Icons.Default.ViewTimeline else Icons.Default.ViewStream,
+                            imageVector = if (showFull24HourGrid) Icons.Default.GridView else Icons.Default.ViewStream,
                             contentDescription = "Toggle 24h and Focus view",
-                            modifier = Modifier.size(15.dp),
-                            tint = if (showFull24HourGrid) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            modifier = Modifier.size(14.dp),
+                            tint = if (showFull24HourGrid) Color(0xFF140D00) else FocusBlueText
                         )
                         Text(
                             text = if (showFull24HourGrid) "24h" else "Focus",
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
-                            color = if (showFull24HourGrid) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
+                            color = if (showFull24HourGrid) Color(0xFF140D00) else FocusBlueText
                         )
                     }
                 }
@@ -654,12 +662,14 @@ private fun DayCalTopBar(
                 IconButton(
                     onClick = onCloudAction,
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(36.dp)
                         .testTag(if (isCloudMode) "sign_out_button" else "switch_to_cloud_button")
                 ) {
                     Icon(
                         imageVector = if (isCloudMode) Icons.AutoMirrored.Filled.Logout else Icons.Default.CloudQueue,
-                        contentDescription = if (isCloudMode) stringResource(id = R.string.sign_out) else "Switch to Google Cloud Sync"
+                        contentDescription = if (isCloudMode) stringResource(id = R.string.sign_out) else "Switch to Google Cloud Sync",
+                        tint = Color(0xFF94A3B8),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -718,6 +728,9 @@ private fun CalendarDatePickerModal(
     }
 }
 
+/**
+ * New / Edit Time Tile Bottom Sheet matching Screenshot 5 (`image_f1ffec0e.png`)
+ */
 @Composable
 private fun TaskTileEditorSheetContent(
     initialTask: DayTask?,
@@ -769,10 +782,9 @@ private fun TaskTileEditorSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
-            .padding(vertical = 8.dp)
-            .padding(bottom = 24.dp)
+            .padding(top = 4.dp, bottom = 28.dp)
     ) {
-        // Header + Compact Horizontal Date Selector
+        // Header + Amber Date Pill (matching Screenshot 5)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -782,123 +794,179 @@ private fun TaskTileEditorSheetContent(
         ) {
             Text(
                 text = if (initialTask == null) "New Time Tile" else "Edit Time Tile",
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
             Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                shape = RoundedCornerShape(16.dp),
+                color = SolarAmberContainer,
+                border = BorderStroke(1.dp, SolarAmberBorder),
                 modifier = Modifier
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .clickable { showSheetDatePicker = true }
                     .testTag("sheet_date_picker_chip")
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.CalendarMonth,
                         contentDescription = "Pick task date",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(15.dp)
+                        tint = SolarAmber,
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = DateUtils.formatShortMonthDay(dateKey),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = SolarAmber
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Horizontal Date Quick Chips
+        // Horizontal Date Quick Chips (Today, Tomorrow, +1 Week, Calendar...)
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
                 val todayKey = DateUtils.todayDateKey()
-                FilterChip(
-                    selected = dateKey == todayKey,
-                    onClick = { dateKey = todayKey },
-                    label = { Text("Today") }
+                SheetPillChip(
+                    label = "Today",
+                    isSelected = dateKey == todayKey,
+                    onClick = { dateKey = todayKey }
                 )
             }
             item {
                 val tomorrowKey = DateUtils.addDays(DateUtils.todayDateKey(), 1)
-                FilterChip(
-                    selected = dateKey == tomorrowKey,
-                    onClick = { dateKey = tomorrowKey },
-                    label = { Text("Tomorrow") }
+                SheetPillChip(
+                    label = "Tomorrow",
+                    isSelected = dateKey == tomorrowKey,
+                    onClick = { dateKey = tomorrowKey }
                 )
             }
             item {
                 val nextWeekKey = DateUtils.addDays(DateUtils.todayDateKey(), 7)
-                FilterChip(
-                    selected = dateKey == nextWeekKey,
-                    onClick = { dateKey = nextWeekKey },
-                    label = { Text("+1 Week") }
+                SheetPillChip(
+                    label = "+1 Week",
+                    isSelected = dateKey == nextWeekKey,
+                    onClick = { dateKey = nextWeekKey }
                 )
             }
             item {
-                FilterChip(
-                    selected = false,
-                    onClick = { showSheetDatePicker = true },
-                    leadingIcon = {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF121826),
+                    border = BorderStroke(1.dp, Color(0xFF243046)),
+                    modifier = Modifier
+                        .height(38.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .clickable { showSheetDatePicker = true }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.CalendarMonth,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                            tint = Color(0xFFF43F5E),
+                            modifier = Modifier.size(15.dp)
                         )
-                    },
-                    label = { Text("Calendar…") }
-                )
+                        Text(
+                            text = "Calendar...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFCBD5E1)
+                        )
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Title & Notes Inputs
+        // Title & Notes Inputs with uppercase monospace labels (matching Screenshot 5)
         Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             OutlinedTextField(
                 value = title,
                 onValueChange = { title = it },
-                label = { Text("Task or Activity Title") },
-                placeholder = { Text("e.g., Deep Focus Session") },
+                label = {
+                    Text(
+                        text = "TASK OR ACTIVITY TITLE",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp
+                    )
+                },
+                placeholder = { Text("e.g., Midday Walk & Mobility") },
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFF0A0E17),
+                    unfocusedContainerColor = Color(0xFF0A0E17),
+                    focusedBorderColor = CyberTeal,
+                    unfocusedBorderColor = Color(0xFF222D42),
+                    focusedLabelColor = Color(0xFF94A3B8),
+                    unfocusedLabelColor = Color(0xFF94A3B8),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("task_title_input")
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             OutlinedTextField(
                 value = notes,
                 onValueChange = { notes = it },
-                label = { Text("Notes (optional)") },
-                maxLines = 2,
+                label = {
+                    Text(
+                        text = "NOTES (OPTIONAL)",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.6.sp
+                    )
+                },
+                minLines = 2,
+                maxLines = 3,
+                shape = RoundedCornerShape(16.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color(0xFF0A0E17),
+                    unfocusedContainerColor = Color(0xFF0A0E17),
+                    focusedBorderColor = CyberTeal,
+                    unfocusedBorderColor = Color(0xFF222D42),
+                    focusedLabelColor = Color(0xFF94A3B8),
+                    unfocusedLabelColor = Color(0xFF94A3B8),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("task_notes_input")
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 1. Horizontal Scroll: Category & Fixed Color Single-Button Row [Focus, Work, Personal, Health, Break]
         Text(
             text = "CATEGORY",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF8B99AF),
+            letterSpacing = 0.8.sp,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -909,36 +977,36 @@ private fun TaskTileEditorSheetContent(
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = if (isSelected) {
-                        palette.accent.copy(alpha = 0.22f)
+                        palette.containerDark
                     } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
+                        Color(0xFF121826)
                     },
+                    border = BorderStroke(
+                        width = if (isSelected) 1.4.dp else 1.dp,
+                        color = if (isSelected) palette.accent else Color(0xFF243046)
+                    ),
                     modifier = Modifier
-                        .border(
-                            width = if (isSelected) 1.5.dp else 1.dp,
-                            color = if (isSelected) palette.accent else Color.Transparent,
-                            shape = RoundedCornerShape(20.dp)
-                        )
+                        .height(38.dp)
                         .clip(RoundedCornerShape(20.dp))
                         .clickable { selectedCategory = cat.key }
                         .testTag("category_chip_${cat.key}")
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(12.dp)
+                                .size(10.dp)
                                 .clip(CircleShape)
                                 .background(palette.accent)
                         )
                         Text(
                             text = cat.label,
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = if (isSelected) palette.onContainerDark else Color(0xFFE2E8F0),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -947,149 +1015,195 @@ private fun TaskTileEditorSheetContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 2. Horizontal Scroll: Start Time
         Text(
             text = "START TIME • ${String.format(java.util.Locale.US, "%02d:%02d", startHour, startMinutePart)}",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF8B99AF),
+            letterSpacing = 0.8.sp,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             item {
-                OutlinedButton(
-                    onClick = { startHour = (startHour - 1).mod(24) },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text("-1h")
-                }
+                SheetStepButton(
+                    label = "-1h",
+                    onClick = { startHour = (startHour - 1).mod(24) }
+                )
             }
             item {
-                OutlinedButton(
-                    onClick = { startHour = (startHour + 1).mod(24) },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text("+1h")
-                }
+                SheetStepButton(
+                    label = "+1h",
+                    onClick = { startHour = (startHour + 1).mod(24) }
+                )
             }
             items(minuteQuarters, key = { "min_$it" }) { q ->
-                FilterChip(
-                    selected = startMinutePart == q,
+                SheetPillChip(
+                    label = String.format(java.util.Locale.US, ":%02d", q),
+                    isSelected = startMinutePart == q,
                     onClick = { startMinutePart = q },
-                    label = { Text(String.format(java.util.Locale.US, ":%02d", q)) }
+                    useMonoFont = true
                 )
             }
             items(quickStartHours, key = { "hr_$it" }) { hr ->
-                FilterChip(
-                    selected = startHour == hr && startMinutePart == 0,
+                SheetPillChip(
+                    label = String.format(java.util.Locale.US, "%02d:00", hr),
+                    isSelected = startHour == hr && startMinutePart == 0,
                     onClick = {
                         startHour = hr
                         startMinutePart = 0
                     },
-                    label = { Text(String.format(java.util.Locale.US, "%02d:00", hr)) }
+                    useMonoFont = true
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         // 3. Horizontal Scroll: Duration
         Text(
             text = "DURATION • ${DateUtils.formatDuration(durationMinutes)}",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF8B99AF),
+            letterSpacing = 0.8.sp,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(durationPresets, key = { it }) { dur ->
-                FilterChip(
-                    selected = durationMinutes == dur,
+                SheetPillChip(
+                    label = DateUtils.formatDuration(dur),
+                    isSelected = durationMinutes == dur,
                     onClick = { durationMinutes = dur },
-                    label = { Text(DateUtils.formatDuration(dur)) }
+                    useMonoFont = true
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // 4. Horizontal Scroll: Reminder
+        // 4. Horizontal Scroll: Reminder (matching Screenshot 5)
         val activeReminderLabel = ReminderOption.fromMinutes(reminderMinutes).label
         Text(
             text = "REMINDER • $activeReminderLabel",
             style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF8B99AF),
+            letterSpacing = 0.8.sp,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         LazyRow(
             contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(ReminderOption.entries, key = { it.minutesBefore }) { option ->
                 val isSelected = reminderMinutes == option.minutesBefore
-                FilterChip(
-                    selected = isSelected,
-                    onClick = {
-                        reminderMinutes = option.minutesBefore
-                        if (option != ReminderOption.NONE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            val hasPerm = ContextCompat.checkSelfPermission(
-                                context,
-                                Manifest.permission.POST_NOTIFICATIONS
-                            ) == PackageManager.PERMISSION_GRANTED
-                            if (!hasPerm) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isSelected) CyberTealContainer else Color(0xFF121826),
+                    border = BorderStroke(
+                        width = if (isSelected) 1.3.dp else 1.dp,
+                        color = if (isSelected) CyberTeal else Color(0xFF243046)
+                    ),
+                    modifier = Modifier
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            reminderMinutes = option.minutesBefore
+                            if (option != ReminderOption.NONE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                val hasPerm = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (!hasPerm) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
                             }
                         }
-                    },
-                    leadingIcon = {
+                        .testTag("reminder_chip_${option.minutesBefore}")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)
+                    ) {
                         Icon(
-                            imageVector = if (option == ReminderOption.NONE) {
-                                Icons.Default.NotificationsNone
-                            } else {
-                                Icons.Default.NotificationsActive
-                            },
+                            imageVector = Icons.Default.Notifications,
                             contentDescription = null,
+                            tint = SolarAmber,
                             modifier = Modifier.size(16.dp)
                         )
-                    },
-                    label = { Text(option.label) },
-                    modifier = Modifier.testTag("reminder_chip_${option.minutesBefore}")
-                )
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) CyberTeal else Color(0xFFCBD5E1),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(22.dp))
 
-        // Action Buttons
+        // Action Buttons (matching Screenshot 5: dark crimson Delete pill + bright Amber Save Changes pill)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             if (onDelete != null) {
                 OutlinedButton(
                     onClick = onDelete,
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(26.dp),
+                    border = BorderStroke(1.dp, Color(0xFF4C1D24)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF1C1016),
+                        contentColor = Color(0xFFFDA4AF)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        text = "Delete",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFDA4AF)
+                    )
                 }
             } else {
                 OutlinedButton(
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f)
+                    shape = RoundedCornerShape(26.dp),
+                    border = BorderStroke(1.dp, Color(0xFF243046)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color(0xFF121826),
+                        contentColor = Color(0xFFCBD5E1)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp)
                 ) {
-                    Text("Cancel")
+                    Text(
+                        text = "Cancel",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
 
@@ -1107,11 +1221,21 @@ private fun TaskTileEditorSheetContent(
                         reminderMinutes
                     )
                 },
+                shape = RoundedCornerShape(26.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = SolarAmber,
+                    contentColor = Color(0xFF140D00)
+                ),
                 modifier = Modifier
-                    .weight(1.4f)
+                    .weight(1.45f)
+                    .height(52.dp)
                     .testTag("save_task_sheet_button")
             ) {
-                Text(if (initialTask == null) "Create Tile" else "Save Changes")
+                Text(
+                    text = if (initialTask == null) "Create Tile" else "Save Changes",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -1125,5 +1249,66 @@ private fun TaskTileEditorSheetContent(
                 showSheetDatePicker = false
             }
         )
+    }
+}
+
+@Composable
+private fun SheetPillChip(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    useMonoFont: Boolean = false
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (isSelected) CyberTealContainer else Color(0xFF121826),
+        border = BorderStroke(
+            width = if (isSelected) 1.3.dp else 1.dp,
+            color = if (isSelected) CyberTeal else Color(0xFF243046)
+        ),
+        modifier = Modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Text(
+                text = label,
+                style = if (useMonoFont) MaterialTheme.typography.labelLarge else MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = if (isSelected) CyberTeal else Color(0xFFCBD5E1)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SheetStepButton(
+    label: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFF121826),
+        border = BorderStroke(1.dp, Color(0xFF243046)),
+        modifier = Modifier
+            .height(38.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = 15.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = SolarAmber
+            )
+        }
     }
 }

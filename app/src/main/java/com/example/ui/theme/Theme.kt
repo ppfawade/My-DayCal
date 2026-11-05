@@ -1,6 +1,5 @@
 package com.example.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
@@ -12,13 +11,13 @@ import androidx.compose.ui.unit.dp
 
 private val DarkColorScheme = darkColorScheme(
     primary = SolarAmber,
-    onPrimary = Color(0xFF1A1102),
+    onPrimary = Color(0xFF160E00),
     primaryContainer = SolarAmberContainer,
     onPrimaryContainer = Color(0xFFFDE68A),
     secondary = CyberTeal,
-    onSecondary = Color(0xFF042F2E),
+    onSecondary = Color(0xFF032219),
     secondaryContainer = CyberTealContainer,
-    onSecondaryContainer = Color(0xFF99F6E4),
+    onSecondaryContainer = Color(0xFF6EE7B7),
     tertiary = CoralRose,
     background = ObsidianBackground,
     onBackground = SlateTextPrimary,
@@ -26,7 +25,7 @@ private val DarkColorScheme = darkColorScheme(
     onSurface = SlateTextPrimary,
     surfaceVariant = ObsidianSurfaceVariant,
     onSurfaceVariant = SlateTextSecondary,
-    outline = Color(0xFF334155)
+    outline = ObsidianBorder
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -49,15 +48,15 @@ private val LightColorScheme = lightColorScheme(
 )
 
 val DaytileShapes = Shapes(
-    small = RoundedCornerShape(10.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(22.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(18.dp),
+    large = RoundedCornerShape(24.dp),
     extraLarge = RoundedCornerShape(28.dp)
 )
 
 @Composable
 fun DaytileTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
