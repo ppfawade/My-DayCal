@@ -17,6 +17,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build-and-release:
     name: Build APK & Publish GitHub Release
@@ -28,19 +31,41 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
-          java-version: "17"
+          java-version: "21"
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.11.1"
-
-      - name: Prepare Signing Keystore
+      - name: Install Gradle 9.3.1 (from gradle-wrapper.properties)
         run: |
+          GRADLE_VERSION="9.3.1"
+          curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip
+          sudo unzip -q -d /opt/gradle /tmp/gradle.zip
+          echo "/opt/gradle/gradle-${GRADLE_VERSION}/bin" >> "$GITHUB_PATH"
+          rm -f /tmp/gradle.zip
+
+      - name: Accept Android SDK Licenses & Install compileSdk 36.1
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          CMDLINE_BIN=$(find "$SDK_ROOT/cmdline-tools" -name sdkmanager | head -n 1)
+          if [ -n "$CMDLINE_BIN" ]; then
+            yes | "$CMDLINE_BIN" --sdk_root="$SDK_ROOT" --licenses > /dev/null || true
+            "$CMDLINE_BIN" --sdk_root="$SDK_ROOT" "platforms;android-36" "platforms;android-36.1" "build-tools;36.0.0" || true
+          fi
+
+      - name: Prepare .env & Signing Keystores (Debug + Release Upload Alias)
+        run: |
+          # Ensure .env exists for Secrets Gradle Plugin
+          if [ ! -f .env ]; then
+            if [ -f .env.example ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+
+          # 1. Debug keystore (alias: androiddebugkey)
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           elif [ ! -f debug.keystore ]; then
@@ -51,17 +76,25 @@ jobs:
               -storepass android -keypass android \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
-          cp debug.keystore my-upload-key.jks
+
+          # 2. Release keystore (alias: upload, required by app/build.gradle.kts release signingConfig)
+          rm -f my-upload-key.jks
+          keytool -genkeypair -v \
+            -keystore my-upload-key.jks \
+            -alias upload \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=My DayCal Release,O=MyDayCal,C=US"
 
       - name: Build Debug & Release APKs
         env:
-          KEYSTORE_PATH: ${{ github.workspace }}/debug.keystore
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
           STORE_PASSWORD: android
           KEY_PASSWORD: android
         run: |
-          gradle :app:assembleDebug :app:assembleRelease --no-daemon
+          gradle :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
 
-      - name: Prepare Versioned APK Artifacts
+      - name: Package Versioned APK Files
         id: prepare_apk
         run: |
           VERSION_NAME=$(grep -m1 'versionName =' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.0")
@@ -81,46 +114,34 @@ jobs:
             cp app/build/outputs/apk/release/app-release-unsigned.apk "dist/My-DayCal-${TAG_NAME}-release.apk"
           fi
 
+          ls -lh dist/
           echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
           echo "version_name=${VERSION_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK Build Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: My-DayCal-APK-${{ steps.prepare_apk.outputs.tag_name }}
-          path: dist/*.apk
-
-      - name: Check If Release Should Be Published
-        id: check_release
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "app/build.gradle.kts")
-          if [[ "${{ github.ref }}" == refs/tags/* ]] || \
-             [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "$COMMIT_MSG" =~ (\[release\]|major:|feat!:|BREAKING) ]] || \
-             echo "$CHANGED_FILES" | grep -qE "^(app/|build\.gradle\.kts|settings\.gradle\.kts)"; then
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Publish GitHub Release with Downloadable APKs
-        if: steps.check_release.outputs.should_release == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.prepare_apk.outputs.tag_name }}
-          name: "My DayCal ${{ steps.prepare_apk.outputs.tag_name }}"
-          generate_release_notes: true
-          body: |
-            ## My DayCal (${{ steps.prepare_apk.outputs.tag_name }})
-            Minimalist daily timeline, journal & 20-year calendar for Android.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.prepare_apk.outputs.tag_name }}"
+          NOTES_FILE="/tmp/release_notes.md"
+          cat <<EOF > "$NOTES_FILE"
+          ## My DayCal ($TAG)
+          Minimalist daily timeline & reflection journal for Android.
 
-            ### Download APK
-            Download and install **`My-DayCal-${{ steps.prepare_apk.outputs.tag_name }}-release.apk`** (or `-debug.apk`) below on any Android device (Android 7.0+ / API 24+).
+          ### Download APK
+          Download and install **\`My-DayCal-${TAG}-release.apk\`** (or \`-debug.apk\`) below on any Android device (Android 7.0+ / API 24+).
 
-            ### Highlights
-            - **Single-Day Timeline & Journal** inspired by [Adiseny/daytile](https://github.com/Adiseny/daytile)
-            - **Offline Local Storage Mode** (Room SQLite, no account required) + **Google Cloud Sync Mode** (Firestore)
-            - **Past Days Archive** & **20-Year Multi-Year Calendar** (±10 years)
-          files: |
-            dist/*.apk
+          ### Highlights
+          - **Focused Single-Day Timeline**: Calendar Week (\`CW\`) + \`Mon\`–\`Fri\` strip, top-bar \`MMM dd\` calendar date picker, and \`Focus\` / \`24h\` view switcher
+          - **Compact Tile Creator & Reminders**: Categories \`[Focus, Work, Personal, Health, Break]\` with fixed color indicators and native notification channels
+          - **Dual Storage**: Offline Local Storage Mode (Room SQLite) + Google Cloud Sync (Firebase Auth & Cloud Firestore)
+          - Inspired by [Adiseny/daytile](https://github.com/Adiseny/daytile)
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.apk --clobber
+          else
+            gh release create "$TAG" dist/*.apk \
+              --title "My DayCal $TAG" \
+              --notes-file "$NOTES_FILE"
+          fi
