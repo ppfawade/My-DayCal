@@ -93,7 +93,7 @@ object DateUtils {
     }
 
     /**
-     * Returns Monday through Friday (Mon..Fri) of the ISO week containing [dateKey].
+     * Returns Monday through Saturday (and Sunday if selected) of the ISO week containing [dateKey].
      */
     fun getWorkWeekDays(dateKey: String): List<DayChipInfo> {
         val today = todayDateKey()
@@ -103,8 +103,9 @@ object DateUtils {
         val offsetToMonday = if (dow == Calendar.SUNDAY) -6 else (Calendar.MONDAY - dow)
         cal.add(Calendar.DAY_OF_MONTH, offsetToMonday)
         val mondayKey = formatCalendar(cal)
+        val lastOffset = if (dow == Calendar.SUNDAY) 6 else 5
 
-        return (0..4).map { dayOffset ->
+        return (0..lastOffset).map { dayOffset ->
             val key = addDays(mondayKey, dayOffset)
             val dCal = parseDateKey(key)
             val dDow = dCal.get(Calendar.DAY_OF_WEEK) - 1

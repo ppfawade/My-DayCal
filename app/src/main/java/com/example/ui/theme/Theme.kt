@@ -10,22 +10,41 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SolarAmber,
-    onPrimary = Color(0xFF160E00),
-    primaryContainer = SolarAmberContainer,
-    onPrimaryContainer = Color(0xFFFDE68A),
-    secondary = CyberTeal,
-    onSecondary = Color(0xFF032219),
-    secondaryContainer = CyberTealContainer,
-    onSecondaryContainer = Color(0xFF6EE7B7),
-    tertiary = CoralRose,
+    primary = SolarAmberPrimary,
+    onPrimary = Color(0xFF472A00),
+    primaryContainer = SolarAmber,
+    onPrimaryContainer = Color(0xFF613B00),
+    inversePrimary = Color(0xFF855300),
+    secondary = HyperSkyLight,
+    onSecondary = Color(0xFF00354A),
+    secondaryContainer = Color(0xFF00A6E0),
+    onSecondaryContainer = Color(0xFF00374D),
+    tertiary = MintSignalLight,
+    onTertiary = Color(0xFF003824),
+    tertiaryContainer = Color(0xFF30C88F),
+    onTertiaryContainer = Color(0xFF004E34),
     background = ObsidianBackground,
-    onBackground = SlateTextPrimary,
-    surface = ObsidianSurface,
-    onSurface = SlateTextPrimary,
+    onBackground = ObsidianOnSurface,
+    surface = ObsidianM3Surface,
+    onSurface = ObsidianOnSurface,
     surfaceVariant = ObsidianSurfaceVariant,
-    onSurfaceVariant = SlateTextSecondary,
-    outline = ObsidianBorder
+    onSurfaceVariant = ObsidianOnSurfaceVariant,
+    surfaceTint = Color(0xFFFFB95F),
+    inverseSurface = ObsidianOnSurface,
+    inverseOnSurface = Color(0xFF2E3037),
+    error = KineticError,
+    onError = KineticOnError,
+    errorContainer = KineticErrorContainer,
+    onErrorContainer = KineticOnErrorContainer,
+    outline = ObsidianOutline,
+    outlineVariant = ObsidianOutlineVariant,
+    surfaceBright = ObsidianSurfaceBright,
+    surfaceDim = ObsidianM3Surface,
+    surfaceContainer = ObsidianSurfaceContainer,
+    surfaceContainerHigh = ObsidianSurfaceHigh,
+    surfaceContainerHighest = ObsidianSurfaceVariant,
+    surfaceContainerLow = ObsidianSurfaceLow,
+    surfaceContainerLowest = ObsidianCanvasLowest
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -47,11 +66,13 @@ private val LightColorScheme = lightColorScheme(
     outline = Color(0xFFD6D0C4)
 )
 
+// Obsidian Kinetic Shapes (sm: 8dp, DEFAULT: 16dp, md: 24dp, lg: 32dp, full: 9999px)
 val DaytileShapes = Shapes(
-    small = RoundedCornerShape(12.dp),
-    medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp),
-    extraLarge = RoundedCornerShape(28.dp)
+    extraSmall = RoundedCornerShape(8.dp),
+    small = RoundedCornerShape(16.dp),
+    medium = RoundedCornerShape(24.dp),
+    large = RoundedCornerShape(32.dp),
+    extraLarge = RoundedCornerShape(48.dp)
 )
 
 @Composable
