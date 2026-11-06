@@ -611,13 +611,18 @@ fun DaytilePlannerShell(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isCloudMode) {
                         Text(
-                            text = "Your timeline tiles sync automatically in real time using free Google Firebase services.",
+                            text = "Your timeline tiles sync automatically in real time across Android, the Home Screen Week Agenda Widget, and the My DayCal Companion Web App.",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
                             text = "Account: $userLabel",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "Web & Android Sync:\nSign in with this same Google account on the Companion Web App (GitHub Pages) to view and edit this schedule from any browser.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
                             text = "Firestore Path:\n• /users/$currentUserId/tasks",
@@ -635,7 +640,7 @@ fun DaytilePlannerShell(
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "Want to sync across devices? Tap 'Sign in with Google' below at any time.",
+                            text = "Want to access your schedule on the Companion Web App and sync across Android devices? Tap 'Sign in with Google' below at any time.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

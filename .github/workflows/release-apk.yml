@@ -73,51 +73,12 @@ jobs:
             if [ -n "$GOOGLE_SERVICES_SECRET" ]; then
               echo "$GOOGLE_SERVICES_SECRET" > app/google-services.json
             else
-              cat << 'EOF' > app/google-services.json
-          {
-            "project_info": {
-              "project_number": "000000000000",
-              "project_id": "my-daycal-local",
-              "storage_bucket": "my-daycal-local.appspot.com"
-            },
-            "client": [
-              {
-                "client_info": {
-                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
-                  "android_client_info": {
-                    "package_name": "com.aistudio.daytile.kxpqzm"
-                  }
-                },
-                "oauth_client": [
-                  {
-                    "client_id": "000000000000-local-only",
-                    "client_type": 3
-                  }
-                ],
-                "api_key": [
-                  {
-                    "current_key": "000000000000000000000000000000000000000"
-                  }
-                ],
-                "services": {
-                  "appinvite_service": {
-                    "other_platform_oauth_client": [
-                      {
-                        "client_id": "000000000000-local-only",
-                        "client_type": 3
-                      }
-                    ]
-                  }
-                }
-              }
-            ],
-            "configuration_version": "1"
-          }
-          EOF
+              DEFAULT_GS_B64="ewogICJwcm9qZWN0X2luZm8iOiB7CiAgICAicHJvamVjdF9udW1iZXIiOiAiOTU0MTAwNTc5NDkiLAogICAgInByb2plY3RfaWQiOiAiZ2VuLWxhbmctY2xpZW50LTA1MDQzMDkyOTQiLAogICAgInN0b3JhZ2VfYnVja2V0IjogImdlbi1sYW5nLWNsaWVudC0wNTA0MzA5Mjk0LmZpcmViYXNlc3RvcmFnZS5hcHAiCiAgfSwKICAiY2xpZW50IjogWwogICAgewogICAgICAiY2xpZW50X2luZm8iOiB7CiAgICAgICAgIm1vYmlsZXNka19hcHBfaWQiOiAiMTo5NTQxMDA1Nzk0OTphbmRyb2lkOjllY2FkNDlmMmEyZDYxNDVkMjIxMzQiLAogICAgICAgICJhbmRyb2lkX2NsaWVudF9pbmZvIjogewogICAgICAgICAgInBhY2thZ2VfbmFtZSI6ICJjb20uYWlzdHVkaW8uZGF5dGlsZS5reHBxem0iCiAgICAgICAgfQogICAgICB9LAogICAgICAib2F1dGhfY2xpZW50IjogWwogICAgICAgIHsKICAgICAgICAgICJjbGllbnRfaWQiOiAiOTU0MTAwNTc5NDktYWJkMDdjaWY1dTEyNTRqcWNrM284djdmM2VwMzNyNjkuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLAogICAgICAgICAgImNsaWVudF90eXBlIjogMSwKICAgICAgICAgICJhbmRyb2lkX2luZm8iOiB7CiAgICAgICAgICAgICJwYWNrYWdlX25hbWUiOiAiY29tLmFpc3R1ZGlvLmRheXRpbGUua3hwcXptIiwKICAgICAgICAgICAgImNlcnRpZmljYXRlX2hhc2giOiAiMTFiMDM1MzgyMDE5MmY5ZmFmY2MwZjNmMGRhOTU0YjVlNzBmYmM0MyIKICAgICAgICAgIH0KICAgICAgICB9LAogICAgICAgIHsKICAgICAgICAgICJjbGllbnRfaWQiOiAiOTU0MTAwNTc5NDktMGF2NmlmbmQ4M2Jma21zYWxqdWg3ZmE3cmFqamw2Ym8uYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLAogICAgICAgICAgImNsaWVudF90eXBlIjogMwogICAgICAgIH0KICAgICAgXSwKICAgICAgImFwaV9rZXkiOiBbCiAgICAgICAgewogICAgICAgICAgImN1cnJlbnRfa2V5IjogIkFJemFTeUE3b3BaTTdZWEhWOWg2NWo2QVV0SmQ4WXlETERQXzMwNCIKICAgICAgICB9CiAgICAgIF0sCiAgICAgICJzZXJ2aWNlcyI6IHsKICAgICAgICAiYXBwaW52aXRlX3NlcnZpY2UiOiB7CiAgICAgICAgICAib3RoZXJfcGxhdGZvcm1fb2F1dGhfY2xpZW50IjogWwogICAgICAgICAgICB7CiAgICAgICAgICAgICAgImNsaWVudF9pZCI6ICI5NTQxMDA1Nzk0OS0wYXY2aWZuZDgzYmZrbXNhbGp1aDdmYTdyYWpqbDZiby5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsCiAgICAgICAgICAgICAgImNsaWVudF90eXBlIjogMwogICAgICAgICAgICB9CiAgICAgICAgICBdCiAgICAgICAgfQogICAgICB9CiAgICB9CiAgXSwKICAiY29uZmlndXJhdGlvbl92ZXJzaW9uIjogIjEiCn0="
+              echo "$DEFAULT_GS_B64" | base64 -d > app/google-services.json
             fi
           fi
 
-          # 3. Debug keystore (alias: androiddebugkey)
+          # 3. Debug keystore (alias: androiddebugkey, SHA-1: 11:B0:35:38:20:19:2F:9F:AF:CC:0F:3F:0D:A9:54:B5:E7:0F:BC:43)
           if [ -f debug.keystore.base64 ]; then
             base64 -d debug.keystore.base64 > debug.keystore
           elif [ ! -f debug.keystore ]; then
@@ -130,13 +91,28 @@ jobs:
           fi
 
           # 4. Release keystore (alias: upload, required by app/build.gradle.kts release signingConfig)
+          # Import the registered OAuth certificate from debug.keystore so both release and debug APKs
+          # match the SHA-1 fingerprint registered in Firebase OAuth (11b0353820192f9fafcc0f3f0da954b5e70fbc43)
           rm -f my-upload-key.jks
-          keytool -genkeypair -v \
-            -keystore my-upload-key.jks \
-            -alias upload \
-            -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=My DayCal Release,O=MyDayCal,C=US"
+          if [ -f debug.keystore ]; then
+            keytool -importkeystore \
+              -srckeystore debug.keystore \
+              -destkeystore my-upload-key.jks \
+              -srcstorepass android \
+              -deststorepass android \
+              -srckeypass android \
+              -destkeypass android \
+              -srcalias androiddebugkey \
+              -destalias upload \
+              -noprompt
+          else
+            keytool -genkeypair -v \
+              -keystore my-upload-key.jks \
+              -alias upload \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass android -keypass android \
+              -dname "CN=My DayCal Release,O=MyDayCal,C=US"
+          fi
 
       - name: Build Debug & Release APKs
         env:
