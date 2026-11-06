@@ -168,7 +168,12 @@ fun onGoogleSignInClicked(
             }
         } catch (e: GetCredentialCancellationException) {
             Log.w("Auth", "Google Sign-In cancelled or dismissed: ${e.message}", e)
-            onAuthCancelled()
+            val msg = e.localizedMessage ?: ""
+            if (msg.contains("10:") || msg.contains("Developer", ignoreCase = true) || msg.contains("not whitelisted", ignoreCase = true)) {
+                onAuthError("Google Sign-In configuration mismatch ($msg). If running the release APK, install the -debug.apk variant or ensure the signing SHA-1 is registered in Firebase.")
+            } else {
+                onAuthCancelled()
+            }
         } catch (e: Exception) {
             Log.e("Auth", "Google Sign-In failed", e)
             onAuthError(e.localizedMessage ?: "Sign in failed")

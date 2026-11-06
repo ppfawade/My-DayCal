@@ -17,12 +17,16 @@ android {
     applicationId = "com.aistudio.daytile.kxpqzm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 4
-    versionName = "1.4"
+    versionCode = 5
+    versionName = "1.4.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     if (!file("google-services.json").exists()) {
-      resValue("string", "default_web_client_id", "000000000000-local-only")
+      resValue("string", "default_web_client_id", "95410057949-0av6ifnd83bfkmsaljuh7fa7rajjl6bo" + ".apps.googleusercontent.com")
+      resValue("string", "project_id", "gen-lang-client-0504309294")
+      resValue("string", "google_app_id", "1:95410057949:android:9ecad49f2a2d6145d22134")
+      resValue("string", "google_api_key", "AIzaSyA7opZM7YXHV9h65j6AUtJd8YyDLDP_304")
+      resValue("string", "google_storage_bucket", "gen-lang-client-0504309294.firebasestorage.app")
     }
   }
 
