@@ -231,35 +231,14 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            // Hero & Emblem Section (Displaying the latest App Icon)
-            Box(
+            // Hero & Emblem Section (Official App Logo)
+            Image(
+                painter = painterResource(id = R.drawable.ic_app_logo),
+                contentDescription = stringResource(id = R.string.app_name),
                 modifier = Modifier
                     .size(96.dp)
-                    .clip(RoundedCornerShape(26.dp))
-                    .background(colors.surfaceContainerLowest)
-                    .border(
-                        width = 1.dp,
-                        color = colors.primaryContainer.copy(alpha = 0.35f),
-                        shape = RoundedCornerShape(26.dp)
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                // Subtle warm ambient glow behind the icon
-                Box(
-                    modifier = Modifier
-                        .size(76.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(colors.primaryContainer.copy(alpha = 0.15f))
-                )
-
-                Image(
-                    painter = painterResource(id = R.drawable.img_launcher_daytile_1793874081765),
-                    contentDescription = stringResource(id = R.string.app_name),
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                )
-            }
+                    .clip(RoundedCornerShape(24.dp))
+            )
 
             Spacer(modifier = Modifier.height(22.dp))
 

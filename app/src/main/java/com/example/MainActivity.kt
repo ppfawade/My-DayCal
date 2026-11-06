@@ -698,26 +698,13 @@ private fun DayCalTopBar(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
+                Image(
+                    painter = painterResource(id = R.drawable.ic_app_logo),
+                    contentDescription = stringResource(id = R.string.app_name),
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(34.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(colors.surfaceContainerHigh)
-                        .border(
-                            width = 1.dp,
-                            color = colors.primaryContainer.copy(alpha = 0.35f),
-                            shape = RoundedCornerShape(9.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.img_launcher_daytile_1793874081765),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(9.dp))
-                    )
-                }
+                )
 
                 Text(
                     text = stringResource(id = R.string.app_name),

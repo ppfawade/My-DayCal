@@ -10,6 +10,7 @@
     android:targetCellHeight="3"
     android:maxResizeWidth="600dp"
     android:maxResizeHeight="800dp"
+    android:previewImage="@drawable/ic_app_logo"
     android:previewLayout="@layout/widget_daycal_agenda"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="1800000"

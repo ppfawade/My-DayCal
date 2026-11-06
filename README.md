@@ -1,6 +1,6 @@
-# My DayCal
+# <img src="docs/logo.png" width="38" height="38" valign="middle" alt="My DayCal Logo" /> My DayCal
 
-**Minimalist tactile daily timeline planner for Android.**
+**Minimalist tactile daily timeline planner for Android & Web.**
 
 [![Android Build & APK Release](https://img.shields.io/badge/GitHub_Actions-APK_Release_Pipeline-F59E0B?logo=githubactions&logoColor=white)](.github/workflows/release-apk.yml)
 [![Platform](https://img.shields.io/badge/Platform-Android_(API_24%2B)-14B8A6?logo=android&logoColor=white)](#)

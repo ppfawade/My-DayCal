@@ -151,8 +151,14 @@ object ReminderNotificationManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val logoBitmap = android.graphics.BitmapFactory.decodeResource(
+            context.resources,
+            R.drawable.ic_app_logo
+        )
+
         val notification = NotificationCompat.Builder(context, CHANNEL_TASK_REMINDERS)
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setLargeIcon(logoBitmap)
             .setContentTitle("$categoryLabel • $title")
             .setContentText("Scheduled at $timeLabel")
             .setPriority(NotificationCompat.PRIORITY_HIGH)

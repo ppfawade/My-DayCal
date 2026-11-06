@@ -18,10 +18,10 @@
 
         <ImageView
             android:id="@+id/widget_header_icon"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:contentDescription="@string/app_name"
-            android:src="@drawable/img_launcher_daytile_1793874081765" />
+            android:src="@drawable/ic_app_logo" />
 
         <LinearLayout
             android:id="@+id/widget_header_text_container"
@@ -103,10 +103,10 @@
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="32dp"
-                android:layout_height="32dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_widget_calendar" />
+                android:src="@drawable/ic_app_logo" />
 
             <TextView
                 android:id="@+id/widget_empty_title_text"
