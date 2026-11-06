@@ -1,8 +1,14 @@
 package com.example.ui.auth
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -23,11 +29,18 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -35,8 +48,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,7 +63,6 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -56,6 +70,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,6 +92,50 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.security.MessageDigest
+
+const val EXPECTED_REGISTERED_SHA1 = "11:B0:35:38:20:19:2F:9F:AF:CC:0F:3F:0D:A9:54:B5:E7:0F:BC:43"
+
+/**
+ * Traverses context wrappers to find the hosting Activity.
+ * Jetpack CredentialManager requires a real Activity to dispatch the Google Sign-In intent result.
+ */
+tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/**
+ * Reads the actual SHA-1 fingerprint of the signing certificate used on the running APK.
+ */
+@Suppress("DEPRECATION")
+fun getInstalledCertificateSha1(context: Context): String {
+    return try {
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val signingInfo = context.packageManager.getPackageInfo(
+                context.packageName,
+                PackageManager.GET_SIGNING_CERTIFICATES
+            ).signingInfo
+            if (signingInfo?.hasMultipleSigners() == true) {
+                signingInfo.apkContentsSigners
+            } else {
+                signingInfo?.signingCertificateHistory
+            }
+        } else {
+            context.packageManager.getPackageInfo(
+                context.packageName,
+                PackageManager.GET_SIGNATURES
+            ).signatures
+        }
+        val cert = signatures?.firstOrNull()?.toByteArray() ?: return "Unknown"
+        val md = MessageDigest.getInstance("SHA-1")
+        val digest = md.digest(cert)
+        digest.joinToString(":") { String.format("%02X", it) }
+    } catch (e: Exception) {
+        "Error: ${e.message}"
+    }
+}
 
 fun attemptAutoSignIn(
     context: Context,
@@ -111,9 +170,11 @@ fun attemptAutoSignIn(
         .addCredentialOption(googleIdOption)
         .build()
 
+    val activity = context.findActivity() ?: return onUnauthenticated()
+
     scope.launch {
         try {
-            val result = credentialManager.getCredential(context, request)
+            val result = credentialManager.getCredential(activity, request)
             val credential = result.credential
             if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
@@ -148,6 +209,12 @@ fun onGoogleSignInClicked(
         return
     }
 
+    val activity = context.findActivity()
+    if (activity == null) {
+        onAuthError("Unable to locate parent Activity for Google Sign-In. Please restart the app.")
+        return
+    }
+
     val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
     val request = GetCredentialRequest.Builder()
         .addCredentialOption(signInOption)
@@ -155,28 +222,31 @@ fun onGoogleSignInClicked(
 
     scope.launch {
         try {
-            val activityContext = context as? Activity ?: context
-            val result = credentialManager.getCredential(activityContext, request)
+            Log.d("Auth", "Requesting credential with Activity context: ${activity.javaClass.name}")
+            val result = credentialManager.getCredential(activity, request)
             val credential = result.credential
             if (credential is CustomCredential && credential.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
                 val googleIdToken = GoogleIdTokenCredential.createFrom(credential.data).idToken
                 val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
                 Firebase.auth.signInWithCredential(authCredential).await()
+                Log.i("Auth", "Firebase authentication succeeded for user: ${Firebase.auth.currentUser?.email}")
                 onAuthSuccess()
             } else {
-                onAuthError("Unexpected credential type")
+                onAuthError("Unexpected credential type returned from Google: ${credential.javaClass.simpleName}")
             }
         } catch (e: GetCredentialCancellationException) {
             Log.w("Auth", "Google Sign-In cancelled or dismissed: ${e.message}", e)
-            val msg = e.localizedMessage ?: ""
-            if (msg.contains("10:") || msg.contains("Developer", ignoreCase = true) || msg.contains("not whitelisted", ignoreCase = true)) {
-                onAuthError("Google Sign-In configuration mismatch ($msg). If running the release APK, install the -debug.apk variant or ensure the signing SHA-1 is registered in Firebase.")
-            } else {
+            val msg = e.localizedMessage ?: e.message ?: ""
+            if (msg.contains("10") || msg.contains("16") || msg.contains("Developer", ignoreCase = true) || msg.contains("not whitelisted", ignoreCase = true)) {
+                onAuthError("Sign-in cancelled by system ($msg). Tap 'Diagnostics & Certificate' below to inspect the installed APK SHA-1 fingerprint.")
+            } else if (msg.contains("cancel", ignoreCase = true)) {
                 onAuthCancelled()
+            } else {
+                onAuthError("Sign-in dismissed ($msg). Tap 'Diagnostics & Certificate' below to verify OAuth configuration.")
             }
         } catch (e: Exception) {
             Log.e("Auth", "Google Sign-In failed", e)
-            onAuthError(e.localizedMessage ?: "Sign in failed")
+            onAuthError(e.localizedMessage ?: "Sign in failed: ${e.javaClass.simpleName}")
         }
     }
 }
@@ -207,7 +277,13 @@ fun AuthScreen(
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showDiagnosticsDialog by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
+
+    val installedSha1 = remember(context) { getInstalledCertificateSha1(context) }
+    val isSha1Matching = remember(installedSha1) {
+        installedSha1.equals(EXPECTED_REGISTERED_SHA1, ignoreCase = true)
+    }
 
     LaunchedEffect(Unit) {
         withFrameNanos { }
@@ -230,7 +306,7 @@ fun AuthScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
-                .padding(horizontal = 24.dp, vertical = 28.dp)
+                .padding(horizontal = 24.dp, vertical = 24.dp)
                 .widthIn(max = 400.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -245,7 +321,7 @@ fun AuthScreen(
                     .clip(RoundedCornerShape(24.dp))
             )
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = stringResource(id = R.string.app_name),
@@ -274,14 +350,21 @@ fun AuthScreen(
                     shape = RoundedCornerShape(18.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
+                        .padding(bottom = 14.dp)
                 ) {
-                    Text(
-                        text = errorMessage ?: "",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onErrorContainer,
-                        modifier = Modifier.padding(14.dp)
-                    )
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = errorMessage ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.onErrorContainer
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Tap 'Diagnostics' below to view signature details",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = colors.onErrorContainer.copy(alpha = 0.8f)
+                        )
+                    }
                 }
             }
 
@@ -342,7 +425,7 @@ fun AuthScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 2. Secondary CTA: Continue Offline + "Local" badge on right
+            // 2. Secondary CTA: Continue Offline + "Local" badge
             Surface(
                 shape = CircleShape,
                 color = colors.surfaceContainerHigh,
@@ -393,7 +476,33 @@ fun AuthScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Diagnostic & Signing Inspector Button
+            Row(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .clickable { showDiagnosticsDialog = true }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = if (isSha1Matching) Icons.Default.CheckCircle else Icons.Default.Info,
+                    contentDescription = null,
+                    tint = if (isSha1Matching) colors.primary else colors.outline,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = if (isSha1Matching) "Verified Signing Certificate" else "Diagnostics & Certificate",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Privacy & Assurance Footnote
             Row(
@@ -416,6 +525,128 @@ fun AuthScreen(
                 )
             }
         }
+    }
+
+    if (showDiagnosticsDialog) {
+        val clientId = runCatching { context.getString(R.string.default_web_client_id) }.getOrDefault("Unavailable")
+        val projectId = runCatching { context.getString(R.string.project_id) }.getOrDefault("gen-lang-client-0504309294")
+        val pkgName = context.packageName
+        val versionName = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName
+        }.getOrDefault("1.4.3")
+
+        AlertDialog(
+            onDismissRequest = { showDiagnosticsDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isSha1Matching) Icons.Default.CheckCircle else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (isSha1Matching) colors.primary else colors.error
+                    )
+                    Text(
+                        text = "Connection & Signing Details",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DiagnosticItem(
+                        label = "App Version",
+                        value = "$versionName ($pkgName)"
+                    )
+
+                    DiagnosticItem(
+                        label = "Signing Status",
+                        value = if (isSha1Matching) "MATCH - Registered Certificate" else "MISMATCH - Certificate Differs",
+                        highlightColor = if (isSha1Matching) colors.primary else colors.error
+                    )
+
+                    DiagnosticItem(
+                        label = "Installed APK SHA-1",
+                        value = installedSha1,
+                        isMonospace = true
+                    )
+
+                    DiagnosticItem(
+                        label = "Registered SHA-1",
+                        value = EXPECTED_REGISTERED_SHA1,
+                        isMonospace = true
+                    )
+
+                    DiagnosticItem(
+                        label = "Firebase Project",
+                        value = projectId
+                    )
+
+                    DiagnosticItem(
+                        label = "Web Client ID",
+                        value = clientId,
+                        isMonospace = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val report = buildString {
+                            appendLine("=== My DayCal Diagnostics ===")
+                            appendLine("Package: $pkgName")
+                            appendLine("Version: $versionName")
+                            appendLine("Installed SHA-1: $installedSha1")
+                            appendLine("Expected SHA-1: $EXPECTED_REGISTERED_SHA1")
+                            appendLine("Match: $isSha1Matching")
+                            appendLine("Project ID: $projectId")
+                            appendLine("Web Client ID: $clientId")
+                        }
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("My DayCal Diagnostics", report))
+                        Toast.makeText(context, "Diagnostic report copied to clipboard", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Icon(imageVector = Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Copy Report")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiagnosticsDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DiagnosticItem(
+    label: String,
+    value: String,
+    isMonospace: Boolean = false,
+    highlightColor: Color? = null
+) {
+    Column {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = value,
+            style = if (isMonospace) MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, fontSize = 11.sp) else MaterialTheme.typography.bodyMedium,
+            color = highlightColor ?: MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (highlightColor != null) FontWeight.SemiBold else FontWeight.Normal
+        )
     }
 }
 

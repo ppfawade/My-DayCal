@@ -78,41 +78,27 @@ jobs:
             fi
           fi
 
-          # 3. Debug keystore (alias: androiddebugkey, SHA-1: 11:B0:35:38:20:19:2F:9F:AF:CC:0F:3F:0D:A9:54:B5:E7:0F:BC:43)
-          if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-          elif [ ! -f debug.keystore ]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -alias androiddebugkey \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
+          # 3. Restore registered OAuth keystore
+          # Registered SHA-1: 11:B0:35:38:20:19:2F:9F:AF:CC:0F:3F:0D:A9:54:B5:E7:0F:BC:43
+          # Registered SHA-256: DD:7B:F8:C2:88:18:08:11:91:EC:90:58:A3:16:79:B3:90:2D:22:00:5A:FD:52:B2:E4:47:EA:B0:D7:A9:AD:C3
+          REGISTERED_KEYSTORE_B64="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"
+          echo "$REGISTERED_KEYSTORE_B64" | base64 -d > debug.keystore
 
           # 4. Release keystore (alias: upload, required by app/build.gradle.kts release signingConfig)
-          # Import the registered OAuth certificate from debug.keystore so both release and debug APKs
-          # match the SHA-1 fingerprint registered in Firebase OAuth (11b0353820192f9fafcc0f3f0da954b5e70fbc43)
+          # Import the registered certificate from debug.keystore into my-upload-key.jks
+          # so BOTH release and debug APKs have the exact SHA-1 fingerprint registered in Firebase OAuth:
+          # SHA-1: 11:B0:35:38:20:19:2F:9F:AF:CC:0F:3F:0D:A9:54:B5:E7:0F:BC:43
           rm -f my-upload-key.jks
-          if [ -f debug.keystore ]; then
-            keytool -importkeystore \
-              -srckeystore debug.keystore \
-              -destkeystore my-upload-key.jks \
-              -srcstorepass android \
-              -deststorepass android \
-              -srckeypass android \
-              -destkeypass android \
-              -srcalias androiddebugkey \
-              -destalias upload \
-              -noprompt
-          else
-            keytool -genkeypair -v \
-              -keystore my-upload-key.jks \
-              -alias upload \
-              -keyalg RSA -keysize 2048 -validity 10000 \
-              -storepass android -keypass android \
-              -dname "CN=My DayCal Release,O=MyDayCal,C=US"
-          fi
+          keytool -importkeystore \
+            -srckeystore debug.keystore \
+            -destkeystore my-upload-key.jks \
+            -srcstorepass android \
+            -deststorepass android \
+            -srckeypass android \
+            -destkeypass android \
+            -srcalias androiddebugkey \
+            -destalias upload \
+            -noprompt
 
       - name: Build Debug & Release APKs
         env:
@@ -126,6 +112,16 @@ jobs:
             -Djava.awt.headless=true \
             --no-daemon \
             --stacktrace
+
+      - name: Verify APK Signing SHA-1 Digests
+        run: |
+          APKSIGNER_BIN=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name apksigner | sort -V | tail -n 1)
+          if [ -n "$APKSIGNER_BIN" ]; then
+            echo "=== Debug APK Certificate Fingerprints ==="
+            "$APKSIGNER_BIN" verify --print-certs app/build/outputs/apk/debug/app-debug.apk || true
+            echo "=== Release APK Certificate Fingerprints ==="
+            "$APKSIGNER_BIN" verify --print-certs app/build/outputs/apk/release/app-release.apk || true
+          fi
 
       - name: Package Versioned APK Files
         id: prepare_apk

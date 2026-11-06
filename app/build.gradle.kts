@@ -17,8 +17,8 @@ android {
     applicationId = "com.aistudio.daytile.kxpqzm"
     minSdk = 24
     targetSdk = 36
-    versionCode = 5
-    versionName = "1.4.2"
+    versionCode = 6
+    versionName = "1.4.3"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     if (!file("google-services.json").exists()) {
