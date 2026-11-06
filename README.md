@@ -50,6 +50,12 @@ You can use **My DayCal** in two ways right from the start screen:
 ### 5. Dual Theme System ("Obsidian Kinetic" Dark & "Warm Ivory" Light)
 - Switch instantly between **Obsidian Kinetic Dark** (engineered for OLED contrast and low-light focus) and **Warm Ivory Light** (designed for outdoor and daytime readability) via the top-bar Sun/Moon toggle.
 
+### 6. Resizable Week Agenda Home Screen Widget
+- **Scrollable Week Task Sequence**: Shows a continuous chronological sequence of scheduled time blocks across the 7-day week with highlighted 'TODAY' and day badges, time ranges, and category color strips.
+- **Universal Sizes & Resizability**: Full launcher resizability (`horizontal|vertical`) supporting common home screen widget sizes (2x2, 3x2, 4x2, 4x3, 4x4).
+- **Direct Interactive Navigation**: Tapping any task item opens the app directly to that date; tapping the header `+` action button opens the new task creator.
+- **Auto-Sync & Offline Ready**: Seamlessly reads both offline Room SQLite tasks and Google Cloud Firestore tasks, auto-refreshing in real time whenever tasks are created, edited, or deleted.
+
 ---
 
 ## Credits, Inspiration & Borrowed Concepts
@@ -85,7 +91,7 @@ This repository includes an automated GitHub Actions pipeline at [`.github/workf
 
 - **Triggers**:
   - Pushing commits to `main` or `master`.
-  - Pushing a version tag (`v*.*.*`, e.g., `git tag v1.2.0 && git push origin v1.2.0`).
+  - Pushing a version tag (`v*.*`, e.g., `git tag v1.4 && git push origin v1.4`).
   - Manual trigger via **Actions → Build & Release Android APK → Run workflow**.
 - **What It Does**:
   - Provisions JDK 21, Gradle, Android SDK 36.1, and signing keystores.

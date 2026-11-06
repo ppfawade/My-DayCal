@@ -38,6 +38,12 @@ class DaytileRepository(
     }
 
     fun observeTasks(userId: String = auth.currentUser?.uid ?: "unauthenticated"): Flow<List<DayTask>> = flow {
+        if (auth.currentUser == null) {
+            throw FirebaseFirestoreException(
+                "User must be signed in with Google before accessing Firestore.",
+                FirebaseFirestoreException.Code.PERMISSION_DENIED
+            )
+        }
         val path = "users/$userId/tasks"
         emitAll(
             db.collection("users").document(userId).collection("tasks")

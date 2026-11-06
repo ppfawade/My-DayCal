@@ -2,6 +2,7 @@ package com.example
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -11,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -102,6 +104,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -145,13 +148,44 @@ private const val KEY_LOCAL_MODE = "use_local_storage_mode"
 private const val KEY_DARK_THEME = "use_dark_theme_mode"
 
 class MainActivity : ComponentActivity() {
+    private val widgetDateKey = mutableStateOf<String?>(null)
+    private val widgetOpenAdd = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         ReminderNotificationManager.createNotificationChannels(this)
+        handleWidgetIntent(intent)
         enableEdgeToEdge()
         setContent {
-            DaytileRootApp()
+            DaytileRootApp(
+                initialDateKey = widgetDateKey.value,
+                initialOpenAdd = widgetOpenAdd.value,
+                onConsumedWidgetIntent = {
+                    widgetDateKey.value = null
+                    widgetOpenAdd.value = false
+                }
+            )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleWidgetIntent(intent)
+    }
+
+    private fun handleWidgetIntent(intent: Intent?) {
+        intent?.getStringExtra(EXTRA_DATE_KEY)?.let {
+            widgetDateKey.value = it
+        }
+        if (intent?.getBooleanExtra(EXTRA_OPEN_ADD, false) == true) {
+            widgetOpenAdd.value = true
+        }
+    }
+
+    companion object {
+        const val EXTRA_DATE_KEY = "com.example.extra.DATE_KEY"
+        const val EXTRA_OPEN_ADD = "com.example.extra.OPEN_ADD"
+        const val EXTRA_TASK_ID = "com.example.extra.TASK_ID"
     }
 }
 
@@ -164,7 +198,11 @@ internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
 }
 
 @Composable
-fun DaytileRootApp() {
+fun DaytileRootApp(
+    initialDateKey: String? = null,
+    initialOpenAdd: Boolean = false,
+    onConsumedWidgetIntent: () -> Unit = {}
+) {
     val context = LocalContext.current
     val prefs = remember(context) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -217,6 +255,9 @@ fun DaytileRootApp() {
                 onToggleTheme = onToggleTheme,
                 currentUserId = user.uid,
                 userLabel = user.email ?: "Signed in with Google",
+                initialDateKey = initialDateKey,
+                initialOpenAdd = initialOpenAdd,
+                onConsumedWidgetIntent = onConsumedWidgetIntent,
                 onExitCurrentMode = {}
             )
         } else if (isLocalStorageMode) {
@@ -227,6 +268,9 @@ fun DaytileRootApp() {
                 onToggleTheme = onToggleTheme,
                 currentUserId = "local_user",
                 userLabel = "Local Device Storage (Offline)",
+                initialDateKey = initialDateKey,
+                initialOpenAdd = initialOpenAdd,
+                onConsumedWidgetIntent = onConsumedWidgetIntent,
                 onExitCurrentMode = {
                     prefs.edit().putBoolean(KEY_LOCAL_MODE, false).apply()
                     isLocalStorageMode = false
@@ -255,6 +299,9 @@ fun DaytilePlannerShell(
     onToggleTheme: () -> Unit = {},
     currentUserId: String,
     userLabel: String,
+    initialDateKey: String? = null,
+    initialOpenAdd: Boolean = false,
+    onConsumedWidgetIntent: () -> Unit = {},
     onExitCurrentMode: () -> Unit
 ) {
     val viewModel: DaytileViewModel = viewModel(
@@ -316,6 +363,31 @@ fun DaytilePlannerShell(
             snackbarHostState.showSnackbar(msg)
             viewModel.clearBanner()
         }
+    }
+
+    LaunchedEffect(initialDateKey) {
+        if (initialDateKey != null) {
+            viewModel.selectDate(initialDateKey)
+            if (!initialOpenAdd) {
+                onConsumedWidgetIntent()
+            }
+        }
+    }
+
+    LaunchedEffect(initialOpenAdd) {
+        if (initialOpenAdd) {
+            editingTask = null
+            presetDateForNewTask = initialDateKey ?: uiState.selectedDateKey
+            presetStartMinute = DateUtils.currentMinuteOfDay()
+            showTaskEditorSheet = true
+            onConsumedWidgetIntent()
+        }
+    }
+
+    LaunchedEffect(uiState.tasksByDate) {
+        val allTasks = uiState.tasksByDate.values.flatten()
+        com.example.widget.DayCalWidgetDataManager.saveTasksCache(context, allTasks)
+        com.example.widget.DayCalWidgetProvider.notifyWidgetDataChanged(context)
     }
 
     Scaffold(
@@ -624,20 +696,21 @@ private fun DayCalTopBar(
                 Box(
                     modifier = Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(9.dp))
                         .background(colors.surfaceContainerHigh)
                         .border(
                             width = 1.dp,
-                            color = colors.primaryContainer.copy(alpha = 0.25f),
-                            shape = RoundedCornerShape(10.dp)
+                            color = colors.primaryContainer.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(9.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Schedule,
+                    Image(
+                        painter = painterResource(id = R.drawable.img_launcher_daytile_1793874081765),
                         contentDescription = null,
-                        tint = colors.primary,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(9.dp))
                     )
                 }
 

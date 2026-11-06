@@ -29,6 +29,24 @@
         <receiver
             android:name=".util.TaskReminderReceiver"
             android:exported="false" />
+
+        <!-- DayCal Week Agenda App Widget -->
+        <receiver
+            android:name=".widget.DayCalWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_agenda_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_daycal_agenda_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.DayCalWidgetService"
+            android:permission="android.permission.BIND_REMOTEVIEWS"
+            android:exported="false" />
     </application>
 
 </manifest>

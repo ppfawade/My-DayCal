@@ -71,6 +71,12 @@ To support both account-free local usage and real-time multi-device cloud synchr
 - **Obsidian Kinetic Dark Theme**: Deep obsidian surfaces (`#0D0F12`, `#15181E`, `#1C2026`) with warm amber primary (`#F5A623`) and gold accents (`#F8B84E`).
 - **Warm Ivory Light Theme**: Daylight-optimized warm alabaster surfaces (`#FAF7F2`, `#F2ECE1`, `#FFFFFF`) with deep amber primary (`#C87A00`) and crisp slate typography (`#181A1F`).
 
+### 3.4 Week Agenda App Widget Architecture (`com.example.widget`)
+- **`DayCalWidgetProvider`**: Android `AppWidgetProvider` handling widget updates, deep-link navigation to `MainActivity`, and header action triggers (Quick Add `+`, Refresh).
+- **`DayCalWidgetService` & `DayCalWidgetViewsFactory`**: `RemoteViewsService` powering a smooth, scrollable `ListView` of week tasks.
+- **`DayCalWidgetDataManager`**: Unified data layer reading synchronous Room SQLite records and cached Google Cloud tasks, chronologically sorting the 7-day week sequence with active/upcoming status, date badges, and category accent strips.
+- **Freeform Resizability**: Android AppWidgetProviderInfo configured with `resizeMode="horizontal|vertical"` and adaptive constraints supporting common home screen widget sizes (2x2, 3x2, 4x2, 4x3, 4x4).
+
 ---
 
 ## 4. High-Performance 20-Year Calendar & O(1) Date Indexing
@@ -101,7 +107,7 @@ gradle :app:testDebugUnitTest
 
 The workflow in `.github/workflows/release-apk.yml` automates APK generation and GitHub Releases:
 
-1. **Automatic Release on Push & Version Tags**: Pushing to `main`/`master` or pushing a tag matching `v*.*.*` (e.g., `v1.2.0`) builds `My-DayCal-<tag>-release.apk` and `My-DayCal-<tag>-debug.apk` and publishes/updates the GitHub Release automatically.
+1. **Automatic Release on Push & Version Tags**: Pushing to `main`/`master` or pushing a tag matching `v*.*` (e.g., `v1.4`) builds `My-DayCal-<tag>-release.apk` and `My-DayCal-<tag>-debug.apk` and publishes/updates the GitHub Release automatically.
 2. **Manual Dispatch**: Can also be triggered on demand from the GitHub Actions tab with a custom release tag.
 
 ---

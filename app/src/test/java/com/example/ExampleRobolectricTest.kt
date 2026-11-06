@@ -56,5 +56,18 @@ class ExampleRobolectricTest {
             notificationManager.getNotificationChannel(ReminderNotificationManager.CHANNEL_TASK_REMINDERS)
         assertNotNull(taskChannel)
         assertTrue(taskChannel.importance >= NotificationManager.IMPORTANCE_HIGH)
+
+        // Verify Widget Data Manager week task sequence
+        val today = DateUtils.todayDateKey()
+        val widgetTasks = listOf(
+            DayTask(id = "w1", dateKey = today, title = "Widget Team Sync", startMinute = 600, durationMinutes = 60, category = "work"),
+            DayTask(id = "w2", dateKey = DateUtils.addDays(today, 1), title = "Deep Work Session", startMinute = 540, durationMinutes = 120, category = "focus")
+        )
+        com.example.widget.DayCalWidgetDataManager.saveTasksCache(context, widgetTasks)
+        val loadedWeekTasks = com.example.widget.DayCalWidgetDataManager.getWeekTasks(context)
+        assertTrue(loadedWeekTasks.isNotEmpty())
+        assertEquals("Widget Team Sync", loadedWeekTasks[0].title)
+        assertEquals("TODAY", loadedWeekTasks[0].dayBadge)
+        assertEquals("WORK", loadedWeekTasks[0].categoryLabel)
     }
 }

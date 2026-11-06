@@ -57,6 +57,12 @@ interface LocalDaytileDao {
 
     @Query("DELETE FROM local_tasks WHERE id = :taskId")
     suspend fun deleteTaskById(taskId: String)
+
+    @Query("SELECT * FROM local_tasks WHERE dateKey >= :startDateKey AND dateKey <= :endDateKey ORDER BY dateKey ASC, startMinute ASC")
+    fun getTasksBetweenSync(startDateKey: String, endDateKey: String): List<LocalTaskEntity>
+
+    @Query("SELECT * FROM local_tasks ORDER BY dateKey ASC, startMinute ASC")
+    fun getAllTasksSync(): List<LocalTaskEntity>
 }
 
 @Database(

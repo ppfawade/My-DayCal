@@ -12,4 +12,9 @@
     <string name="empty_day_title">Open Canvas for This Day</string>
     <string name="empty_day_subtitle">Tap any hour slot on the 24-hour timeline or press + to block your time.</string>
     <string name="btn_populate_starter">Starter Day</string>
+    <string name="widget_agenda_name">My DayCal Agenda</string>
+    <string name="widget_agenda_description">Scrollable week agenda and task timeline with quick add.</string>
+    <string name="widget_empty_title">No tasks scheduled this week</string>
+    <string name="widget_empty_subtitle">Tap + to block your time</string>
+    <string name="widget_week_agenda">Week Agenda</string>
 </resources>

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -53,6 +54,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -229,48 +231,34 @@ fun AuthScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            // Hero & Emblem Section
+            // Hero & Emblem Section (Displaying the latest App Icon)
             Box(
                 modifier = Modifier
                     .size(96.dp)
-                    .clip(RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(26.dp))
                     .background(colors.surfaceContainerLowest)
-                    .border(1.dp, colors.primaryContainer.copy(alpha = 0.25f), RoundedCornerShape(28.dp)),
+                    .border(
+                        width = 1.dp,
+                        color = colors.primaryContainer.copy(alpha = 0.35f),
+                        shape = RoundedCornerShape(26.dp)
+                    ),
                 contentAlignment = Alignment.Center
             ) {
+                // Subtle warm ambient glow behind the icon
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(colors.primaryContainer.copy(alpha = 0.14f))
+                        .size(76.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.primaryContainer.copy(alpha = 0.15f))
                 )
 
-                val barColor = colors.primaryContainer
-                Canvas(modifier = Modifier.size(48.dp)) {
-                    val scale = size.width / 48f
-                    val barHeight = 4.5f * scale
-                    val radius = CornerRadius(2.25f * scale, 2.25f * scale)
-                    val startX = 6f * scale
-
-                    drawRoundRect(
-                        color = barColor,
-                        topLeft = Offset(startX, 11f * scale),
-                        size = Size(36f * scale, barHeight),
-                        cornerRadius = radius
-                    )
-                    drawRoundRect(
-                        color = barColor.copy(alpha = 0.85f),
-                        topLeft = Offset(startX, 22f * scale),
-                        size = Size(24f * scale, barHeight),
-                        cornerRadius = radius
-                    )
-                    drawRoundRect(
-                        color = barColor.copy(alpha = 0.60f),
-                        topLeft = Offset(startX, 33f * scale),
-                        size = Size(16f * scale, barHeight),
-                        cornerRadius = radius
-                    )
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.img_launcher_daytile_1793874081765),
+                    contentDescription = stringResource(id = R.string.app_name),
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                )
             }
 
             Spacer(modifier = Modifier.height(22.dp))

@@ -7,12 +7,13 @@ on:
       - master
     tags:
       - "v*.*.*"
+      - "v*.*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag name (e.g., v1.1.0)"
+        description: "Release tag name (e.g., v1.4)"
         required: false
-        default: "latest"
+        default: "v1.4"
 
 permissions:
   contents: write
@@ -153,13 +154,13 @@ jobs:
       - name: Package Versioned APK Files
         id: prepare_apk
         run: |
-          VERSION_NAME=$(grep -m1 'versionName =' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.0")
+          VERSION_NAME=$(grep -m1 'versionName =' app/build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/' || echo "1.4")
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${GITHUB_REF#refs/tags/}"
           elif [[ -n "${{ github.event.inputs.release_tag }}" && "${{ github.event.inputs.release_tag }}" != "latest" ]]; then
             TAG_NAME="${{ github.event.inputs.release_tag }}"
           else
-            TAG_NAME="v${VERSION_NAME}.${GITHUB_RUN_NUMBER}"
+            TAG_NAME="v${VERSION_NAME}"
           fi
 
           mkdir -p dist
